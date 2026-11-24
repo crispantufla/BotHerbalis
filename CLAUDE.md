@@ -131,6 +131,31 @@ Entraron el 2026-11-12, tras revisar a mano las charlas del guion por zona:
   anota en `sharedState.adGreetings` (`_noteAdGreeting`) y el handler de salientes lo trata como la
   bienvenida automática de WhatsApp Business: no pausa.
 
+- **Revisión de los reportes del 19 al 23-nov (24-nov)**. Tests: `tests/review_nov23_fixes.test.js`.
+  - El saludo con IA (cliente que abre con una duda) ya no pregunta los kilos: contesta, manda
+    `prices_club` y deja en `waiting_preference`. En el saludo la FAQ no actúa (lo contesta ese paso).
+    `waiting_weight` no manda la lista a un "no gracias / me equivoqué" (se despide), a un "gracias"
+    suelto (la ofrece) ni a un enlace (no responde).
+  - `rememberZoneFromMessage` (`deliveryZone.ts`, lo llama `salesFlow`): la localidad dicha antes del
+    paso de zona queda en `deliveryZone` + `partialAddress.ciudad`; con eso las FAQ `zoneAware` dejan
+    de preguntar "¿De qué localidad sos?". Además ninguna FAQ se manda dos veces (mira los últimos 8
+    mensajes del bot): la segunda vez contesta el paso.
+  - `state.deferredAt`: lo anota `salesFlow` cuando el cliente avisa que compra más adelante
+    (`intent.defers`, `detectPostponeDeferral` o la objeción `postergar`). En `waiting_data` un "ya te
+    agendé / te aviso / gracias" no vuelve a pedir datos, y el recordatorio usa el texto de "sin
+    apuro", no el de "me falta tu nombre". `SOFT_CLOSE` ("no gracias", "nada más") marca
+    `cartRecovered`: sin recordatorio.
+  - Una pregunta de salud o edad (`intent.health`, "N años", "médico") no pasa por `detectObjection`.
+  - Debounce de 15 s (en vez de 10) para un mensaje de hasta 3 palabras sin pregunta en
+    `waiting_preference`, `waiting_plan_choice` y `waiting_zone`: "Si gotas" + "120 días" salían como
+    dos turnos.
+  - Reporte diario: "sin respuesta" se filtra en código (solo charlas donde el último en hablar fue
+    el cliente) y el prompt no le carga al bot lo que contestó el vendedor.
+  - Mientras el chat está pausado desde el panel, lo que escribe el cliente NO se procesa al
+    despausar con el interruptor (para eso está "Retomar"): así se perdieron dos mensajes el 22-nov.
+  - `zone_flow.test.js` tiene un test que depende de la hora ("insiste con pagar al recibir"): de
+    noche (hora ARG) falla porque sale el mensaje de fuera de horario.
+
 Flujo de un mensaje: `client.on('message')` → `messageHandler` (debounce ~N segundos para agrupar mensajes consecutivos) → encola en BullMQ → worker pulls → `processSalesFlow` → step correspondiente en `src/flows/steps/` → `sendMessageWithDelay` (4-8s delay humanizado).
 
 ## Flujo de venta (`src/flows/steps/`)

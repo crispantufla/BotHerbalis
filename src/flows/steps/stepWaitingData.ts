@@ -1172,6 +1172,21 @@ export async function handleWaitingData(
         logger.info(`[WAITING_DATA] ${userId} agradece mientras espera — no re-pido datos.`);
         return { matched: true };
     }
+    // Avisó hace poco que compra más adelante y ahora solo se despide ("Ya te
+    // agendé", "Te aviso", "Gracias"): no se le vuelve a pedir nombre y calle.
+    // El 22-nov-2026 "Ya te agendé" recibió "¡Dale! Pasame tu Nombre completo".
+    // Un "sí/dale" no entra acá: puede estar aceptando que se lo agenden.
+    const _recentlyDeferred = !!currentState.deferredAt && (Date.now() - Number(currentState.deferredAt)) < 48 * 3600_000;
+    const _LATER_ACK = /\b(te (aviso|escribo|mando|hablo|confirmo|agende)|ya te agende|cuando (cobre|pueda)|despues|luego|mas adelante)\b/;
+    if (_recentlyDeferred && !/\d/.test(text) && text.trim().split(/\s+/).length <= 8
+        && (_LATER_ACK.test(normalizedText) || _PURE_COURTESY.test(normalizedText))) {
+        currentState.awaitingResume = true;
+        dependencies.saveState(userId);
+        const laterMsg = '¡Dale, quedamos así! 😊 Cuando quieras retomarlo me escribís y lo dejamos listo.';
+        if (!_isDuplicate(laterMsg, currentState.history)) await dependencies.sendMessageWithDelay(userId, laterMsg);
+        logger.info(`[WAITING_DATA] ${userId} ya avisó que compra más adelante y se despide ("${text.slice(0, 40)}") — no re-pido datos.`);
+        return { matched: true };
+    }
     // Cualquier otro mensaje sustantivo: el cliente volvió, retomamos normal.
     if (currentState.awaitingResume) currentState.awaitingResume = false;
 

@@ -107,6 +107,10 @@ function _detectAbandonReason(state: UserState): 'payment_timing' | 'hesitation'
     const t = lastUserMsg.content.toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
     if (/cobro|sueldo|plata|quincena|depositan|me pagan|sin guita|no tengo la plata|no me alcanza/.test(t)) return 'payment_timing';
     if (/pensar|despues|luego|manana|te aviso|te confirmo|mas tarde|semana que viene|mes que viene/.test(t)) return 'hesitation';
+    // Avisó que compra más adelante (lo anota salesFlow) aunque su último mensaje
+    // sea un "dale, gracias": el recordatorio es el de "sin apuro / te lo agendo",
+    // no el que le reclama nombre y calle (caso 5493416594707, 21-nov-2026).
+    if (state.deferredAt && (Date.now() - Number(state.deferredAt)) < 72 * 3600_000) return 'hesitation';
     if (/resultado|miedo|seguro|funciona|garantia|duda|probar|riesgo|caro|precio|sale|vale/.test(t)) return 'objection';
     return 'generic';
 }

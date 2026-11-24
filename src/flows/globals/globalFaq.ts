@@ -53,6 +53,13 @@ export async function handleFaq(
     const skipSteps = new Set(['waiting_admin_validation', 'completed', 'rejected_medical', 'rejected_abusive', 'rejected_geo', 'closing']);
     if (skipSteps.has(currentState.step as string)) return null;
 
+    // Guion por zona: el primer mensaje lo contesta el saludo, que responde la
+    // duda con la IA, se presenta y manda la lista de precios. La FAQ sola
+    // dejaba la charla sin presentación, sin precio y sin pregunta: "¿Cuánto
+    // cuestan las gotas? Tengo diabetes tipo II, ¿podría tomarlas?" recibió
+    // solo el párrafo de salud y no siguió (21-nov-2026).
+    if (currentState.step === 'greeting' && knowledge?.flow?.prices_club) return null;
+
     const norm = _normalize(text);
 
     // Buscar el FAQ cuyo keyword más largo matchea (más específico gana).
@@ -173,6 +180,19 @@ export async function handleFaq(
             logger.info(`[FAQ] Skip FAQ — nombra la tarjeta y el pago con tarjeta está apagado; que la responda la IA (${userId})`);
             return null;
         }
+    }
+
+    // La misma respuesta fija no se manda dos veces: si el cliente vuelve a
+    // preguntar es que no le sirvió. "Me refiero si se puede pagar en dos o tres
+    // pagos con tarjeta" recibió tres veces "Depende de la zona… ¿De qué
+    // localidad sos?" (20-nov-2026). La segunda vez contesta el paso o la IA.
+    const sentBefore = (currentState.history || [])
+        .filter((h: any) => h && h.role === 'bot' && typeof h.content === 'string')
+        .slice(-8)
+        .some((h: any) => h.content.trim().slice(0, 60) === faqResponse.trim().slice(0, 60));
+    if (sentBefore) {
+        logger.info(`[FAQ] Skip FAQ — ${userId} ya recibió esa respuesta; que conteste el paso ${currentState.step}`);
+        return null;
     }
 
     const passthrough = dataBlockPassthrough || mapsPassthrough;

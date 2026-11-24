@@ -291,6 +291,52 @@ export function findZoneInHistory(history: any[] | undefined, knowledge?: any): 
     return null;
 }
 
+// Pasos en los que todavía no se preguntó la localidad.
+const PRE_ZONE_STEPS = new Set(['greeting', 'waiting_weight', 'waiting_preference', 'waiting_preference_consultation', 'waiting_plan_choice', 'waiting_price_confirmation', 'waiting_ok']);
+const BOT_TALKS_PLACE = /localidad|ciudad|pueblo|rosario|zona/i;
+const ASKS_OUR_PLACE = /\b(son|sos|estan|ustedes|uds|quedan|se encuentran)\b[^.]{0,20}\b(de|en)\b|\bde donde (son|sos|envian|mandan|despachan)\b/;
+
+/**
+ * El cliente dice de dónde es ANTES de que se lo pregunten ("SOY DE Rosario"
+ * mientras elige producto, o "Rosario" a secas cuando el bot acaba de hablarle
+ * de las zonas). Se guarda en el estado para que nadie se lo vuelva a
+ * preguntar: hasta el 23-nov-2026 solo lo guardaba el paso de localidad, y la
+ * respuesta fija de pago (que termina en "¿De qué localidad sos?") se la pidió
+ * tres veces a una clienta que ya lo había dicho.
+ *
+ * Solo anota `deliveryZone` y la ciudad; el resto (reparto, medio de pago, el
+ * mensaje de la rama) lo sigue resolviendo `_resolveZone` cuando toca.
+ * Devuelve true si anotó algo.
+ */
+export function rememberZoneFromMessage(text: string, state: any, knowledge?: any): boolean {
+    if (!state || state.deliveryZone === 'in' || state.deliveryZone === 'out') return false;
+    if (!PRE_ZONE_STEPS.has(String(state.step || ''))) return false;
+    const raw = String(text || '');
+    if (!raw.trim() || raw.length > 300) return false;
+    const n = normalizePlace(raw);
+    // Pregunta dónde estamos NOSOTROS ("¿Son de Rosario?", "ustedes están en
+    // Funes?"): nombra un lugar pero no es el suyo.
+    if (ASKS_OUR_PLACE.test(n) && !/\b(soy|somos|vivo|vivimos|estoy|estamos)\b/.test(n)) return false;
+
+    let hit = findZoneInHistory([{ role: 'user', content: raw }], knowledge);
+    if (!hit) {
+        // A secas ("Rosario", "Rosario zona oeste") vale solo como respuesta
+        // corta a un mensaje del bot que hablaba de la zona.
+        const words = n.split(/\s+/).filter(Boolean).length;
+        const history: any[] = Array.isArray(state.history) ? state.history : [];
+        const lastBot = [...history].reverse().find((h) => h && h.role === 'bot');
+        if (words <= 5 && !/[?¿]/.test(raw) && lastBot && BOT_TALKS_PLACE.test(String(lastBot.content || ''))) {
+            const cls = classifyZoneText(raw, knowledge);
+            if (cls.zone === 'in' || cls.zone === 'out') hit = cls;
+        }
+    }
+    if (!hit || (hit.zone !== 'in' && hit.zone !== 'out')) return false;
+    state.deliveryZone = hit.zone;
+    if (!state.partialAddress) state.partialAddress = {};
+    if (hit.localidad) state.partialAddress.ciudad = hit.localidad;
+    return true;
+}
+
 function _titleCase(s: string): string {
     return s.split(' ').map((w) => w ? w[0].toUpperCase() + w.slice(1) : w).join(' ');
 }

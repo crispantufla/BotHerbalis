@@ -103,7 +103,11 @@ export async function handleGreeting(
     // Solo para preguntas cortas de precio; si trae otras dudas responde la IA.
     const _asksPrice = _substantiveOpening
         && /\b(precios?|cuanto\s+(sale|cuesta|vale|es|salen|cuestan)|que\s+precio|costo|valor|presio)\b/i.test(_norm);
-    if (_asksPrice && knowledge?.flow?.prices_club?.response && text.trim().split(/\s+/).length <= 8) {
+    // Si junto con el precio trae otra duda ("¿Cuánto cuesta la cápsula? y qué
+    // contiene", "…tengo diabetes, ¿puedo tomarlas?") la lista sola la ignora:
+    // contesta la IA de más abajo y la lista va después (charlas del 20 al 23-nov-2026).
+    const _extraDoubt = /\b(contiene\w*|ingredientes|componentes|de que esta|como (se|lo|la|las) tom\w+|que hace|para que sirve|efectos?|rebote|contraindicaci\w+|diabet\w+|hipertens\w+|presion|tiroides|colesterol|embaraz\w+|lactancia|medicaci\w+|medicamento\w*|puedo tomar\w*|podria tomar\w*|anos)\b/.test(_norm);
+    if (_asksPrice && !_extraDoubt && knowledge?.flow?.prices_club?.response && text.trim().split(/\s+/).length <= 8) {
         const { FlowStep } = require('../../types/state');
         _setStep(currentState, FlowStep.WAITING_PREFERENCE);
         saveState(userId);
@@ -123,7 +127,34 @@ export async function handleGreeting(
     }
 
     const _ai = (dependencies as any).aiService;
-    if (_substantiveOpening && _ai && typeof _ai.chat === 'function') {
+    // Guion por zona: el saludo ya no pregunta los kilos. La IA contesta la
+    // consulta y la lista de precios va en el mensaje siguiente. Hasta el
+    // 23-nov-2026 esta rama seguía cerrando con "¿cuántos kilos querés bajar?"
+    // y dejaba al cliente en el paso que manda la lista a cualquier respuesta:
+    // "Gracias por responderme" y "me equivoqué" recibieron los precios.
+    if (_substantiveOpening && knowledge?.flow?.prices_club?.response && _ai && typeof _ai.chat === 'function') {
+        try {
+            const aiOpen = await _ai.chat(text, {
+                step: 'greeting',
+                goal: `El cliente ABRIÓ la conversación con una pregunta o comentario, NO un saludo simple. Su mensaje: "${text}". Sos Elena de Herbalis. (1) Presentate en una línea como Elena de Herbalis (Nuez de la India, 100% natural). (2) Respondé TODO lo que pregunta o comenta (qué es, qué contiene, cómo se toma, su salud, su edad, su desconfianza) de forma cálida, honesta y BREVE con el knowledge, sin inventar. (3) NO escribas precios ni planes: el sistema manda la lista de precios en el mensaje siguiente. (4) NO preguntes cuántos kilos quiere bajar ni hagas ninguna otra pregunta. (5) Cerrá con una frase corta que anuncie los precios (por ejemplo "Te paso los precios 👇"). 🛑 NO derives al médico bajo ninguna circunstancia.`,
+                history: currentState.history,
+                summary: currentState.summary,
+                knowledge,
+                userState: currentState,
+            });
+            if (aiOpen.response) {
+                const { FlowStep } = require('../../types/state');
+                await sendMessageWithDelay(userId, aiOpen.response);
+                await sendMessageWithDelay(userId, _formatMessage(knowledge.flow.prices_club.response, currentState));
+                _setStep(currentState, FlowStep.WAITING_PREFERENCE);
+                saveState(userId);
+                logger.info(`[GREETING-AI] User ${userId} abrió con consulta sustantiva — IA respondió + lista de precios.`);
+                return { matched: true };
+            }
+        } catch (e: any) {
+            logger.warn(`[GREETING-AI] falló para ${userId}: ${e.message} — caigo al saludo scripted.`);
+        }
+    } else if (_substantiveOpening && _ai && typeof _ai.chat === 'function') {
         try {
             const openGoal = `El cliente ABRIÓ la conversación con una pregunta o comentario, NO un saludo simple. Su mensaje: "${text}". Sos Elena de Herbalis. (1) Respondé su consulta/comentario de forma cálida, honesta y BREVE con el knowledge — sin inventar precios, estudios ni datos que no tengas. (2) Si pregunta el PRECIO, NO tires un número suelto: decile que depende del plan (60 o 120 días) y que para recomendarte bien primero necesitás saber cuántos kilos quiere bajar. (3) Presentate en una línea como Elena de Herbalis (Nuez de la India, 100% natural) si viene al caso. (4) Cerrá con UNA sola pregunta: cuántos kilos querés bajar, ¿hasta 10 kg o más de 10 kg? 🛑 NO derives al médico bajo ninguna circunstancia.`;
             const aiOpen = await _ai.chat(text, {

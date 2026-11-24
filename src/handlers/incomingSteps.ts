@@ -21,6 +21,7 @@ const { redisConnection } = require('../services/queueService');
 const { _isAdminPhone, _setStep } = require('../flows/utils/flowHelpers');
 
 const DEBOUNCE_MS = 10000;
+const SHORT_REPLY_DEBOUNCE_MS = 15000;
 
 // Eventos que WhatsApp emite por el mismo canal que los mensajes pero que NO
 // son una persona escribiendo (rotación de claves, cambios de grupo, llamadas,
@@ -463,6 +464,16 @@ export function enqueueDebounced(msg: any, userId: string, msgText: string, rt: 
     }
 
     const msgObj = { text: msgText, timestamp: msg.timestamp || Math.floor(Date.now() / 1000) };
+
+    // En plena elección el cliente suele contestar en dos mensajes cortos ("Si
+    // gotas" y, 13 segundos después, "120 días"): con 10 s cada uno salía como un
+    // turno aparte y recibía dos respuestas que se pisaban (22-nov-2026). A un
+    // mensaje corto y sin pregunta se le da un poco más de tiempo.
+    const midChoice = ['waiting_preference', 'waiting_plan_choice', 'waiting_zone'].includes(String(userState[userId]?.step || ''));
+    const soFar = (pendingMessages.get(userId)?.messages || []).map((m) => m.text).concat(msgText).join(' ');
+    if (midChoice && !/[?¿]/.test(soFar) && soFar.trim().split(/\s+/).length <= 3) {
+        currentDelay = SHORT_REPLY_DEBOUNCE_MS;
+    }
 
     if (pendingMessages.has(userId)) {
         const pending = pendingMessages.get(userId)!;

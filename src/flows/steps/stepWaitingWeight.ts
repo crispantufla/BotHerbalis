@@ -142,6 +142,32 @@ export async function handleWaitingWeight(
         // preguntas... todos recibieron solo los precios (revisión del 12-nov).
         // Antes del guion por zona este paso se lo pasaba a la IA.
         const words = text.trim().split(/\s+/).length;
+        // La lista de precios es la respuesta a "sí, pasámelos", no a cualquier
+        // cosa. Del 20 al 23-nov-2026 la recibieron "Noooo... gracias, me
+        // equivoqué", "Gracias por responderme" y una invitación de Temu.
+        const mentionsOffer = /\b(precios?|cuanto|sale|cuesta|valor|costo|got\w*|capsul\w*|semill\w*|pastill\w*|kilos?|kg|info\w*)\b/.test(normalizedText);
+        if (/(https?:\/\/|www\.)\S+/i.test(text) && !mentionsOffer) {
+            logger.info(`[CLUB-PRECIOS] ${userId} mandó un enlace ("${text.slice(0, 50)}") → no es una consulta, no respondo.`);
+            return { matched: true };
+        }
+        const lastBotMsg = String(([...(currentState.history || [])].reverse().find((h: any) => h && h.role === 'bot') as any)?.content || '').trim().toLowerCase();
+        const sendOnce = async (msg: string) => {
+            // Mismo criterio que _isDuplicate, sin el import: no repetir lo último que dijo el bot.
+            if (lastBotMsg !== msg.trim().toLowerCase()) await sendMessageWithDelay(userId, msg);
+        };
+        if (words <= 8 && !mentionsOffer && /\b(no,?\s*gracias|me equivoque|numero equivocado|chat equivocado|no me interesa|no quiero|no necesito|era para otr[oa])\b/.test(normalizedText)) {
+            currentState.cartRecovered = true; // sin recordatorio a quien dijo que no
+            saveState(userId);
+            await sendOnce('¡Tranqui, no pasa nada! 😊 Si más adelante querés saber algo, acá estoy.');
+            logger.info(`[CLUB-PRECIOS] ${userId} no quiere seguir ("${text.slice(0, 50)}") → me despido sin mandar la lista.`);
+            return { matched: true };
+        }
+        if (/^\s*(ok[\s,.!]*)?(muchas\s+|mil\s+)?gracias(\s+por\s+(responder\w*|contestar\w*|la\s+info\w*|la\s+respuesta|todo))?[\s,.!🙏👍😊]*$/u.test(normalizedText)) {
+            saveState(userId);
+            await sendOnce('¡De nada! 😊 ¿Te paso los precios así los vas mirando?');
+            logger.info(`[CLUB-PRECIOS] ${userId} solo agradeció → no mando la lista, la ofrezco.`);
+            return { matched: true };
+        }
         const looksLikeBlob = /^\/9j\//.test(text) || /^[A-Za-z0-9+/=]{200,}$/.test(text.trim());
         const justPrice = words <= 6
             && /\b(precios?|cuanto\s+(sale|cuesta|vale|es|salen|cuestan)|q(ue)?\s+sale|que\s+precio|valor|costo)\b/.test(normalizedText)

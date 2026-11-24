@@ -215,7 +215,7 @@ const ESCALATED_REBUTTALS: Record<ObjectionMatch['type'], string[]> = {
     ],
     postergar: [
         'Mirá, te propongo concreto: *te lo agendo para la fecha que cobres*. Decime el día exacto (por ejemplo: 30/05 o "5 del mes que viene") y te lo despacho para que te llegue justo. ¿Te conviene así?',
-        'Dale, *te lo programo postdatado* — me decís la fecha de cobro y el bot lo despacha justo para entonces. ¿Para qué día te conviene?',
+        'Dale, *te lo programo postdatado* — me decís la fecha de cobro y lo despacho justo para entonces. ¿Para qué día te conviene?',
     ],
     pensar: [
         'Dale, *te reservo el pedido a tu nombre por 48 horas*, sin que tengas que adelantar nada. En ese plazo me decís si avanzamos, si no, lo libero sin compromiso. ¿Te parece?',

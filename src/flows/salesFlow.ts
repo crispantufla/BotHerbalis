@@ -4,7 +4,8 @@ import logger from '../utils/logger';
 import { processGlobals } from './globals';
 import { processStep } from './steps';
 import { _pauseAndAlert, _setStep, _extractSilentVariables, _cleanPhone, _isGhostClose, _pushHistory } from './utils/flowHelpers';
-import { detectObjection } from './utils/objectionDetector';
+import { detectObjection, detectPostponeDeferral } from './utils/objectionDetector';
+import { rememberZoneFromMessage } from './utils/deliveryZone';
 import { isMpEnabled } from './utils/paymentOptions';
 import { parseControlTag } from './utils/extractedData';
 import { classifyNewLead, createInitialUserState } from './leadClassifier';
@@ -28,6 +29,9 @@ interface SalesFlowDependencies {
     sellerId?: string; // seller identity for scoped DB queries
     _recursionDepth?: number; // profundidad actual — la stashea processSalesFlow para que los steps que re-invocan (stepGreeting) la propaguen
 }
+
+// El cliente cierra la charla o dice que no quiere: no se le manda recordatorio.
+const SOFT_CLOSE = /\b(no,?\s*gracias|nada mas|no me interesa|no quiero (nada|comprar|comprarlo|seguir)|me equivoque|no lo voy a (comprar|pedir))\b/;
 
 // Ad source detection from pre-filled Click-to-WhatsApp messages (literal match)
 const AD_SOURCES: { text: string; name: string }[] = [
@@ -261,6 +265,24 @@ export async function processSalesFlow(
         dependencies = { ...dependencies, intent };
     }
 
+    // 1.95 Cosas que el cliente dice de pasada y hay que RECORDAR aunque el paso
+    // actual no las esté esperando (charlas del 20 al 23-nov-2026):
+    //  - su localidad: "SOY DE Rosario" dicho mientras elegía producto no quedaba
+    //    en el estado, y la respuesta fija de pago le preguntó tres veces de dónde era;
+    //  - que compra más adelante: el paso de datos volvía a pedirle nombre y calle;
+    //  - que no quiere seguir: al día siguiente le llegaba el recordatorio.
+    if (_recursionDepth === 0 && !(currentState as any).promo?.active) {
+        if (rememberZoneFromMessage(text, currentState, knowledge)) {
+            logger.info(`[ZONE] ${userId} dijo su localidad de pasada (${currentState.partialAddress?.ciudad || '?'}, ${currentState.deliveryZone}) en ${currentState.step} → queda anotada.`);
+        }
+        if (dependencies.intent?.defers === true || detectPostponeDeferral(normalizedText)) {
+            currentState.deferredAt = Date.now();
+        }
+        if (SOFT_CLOSE.test(normalizedText) && normalizedText.trim().split(/\s+/).length <= 8) {
+            currentState.cartRecovered = true;
+        }
+    }
+
     // 2. Execute Global Interceptors (Priority 0 and 1)
     const globalsResult = await processGlobals(userId, text, normalizedText, currentState, knowledge, dependencies);
     if (globalsResult && globalsResult.matched) {
@@ -273,8 +295,16 @@ export async function processSalesFlow(
     //   standard  → rebuttal genérico (1ra vez)
     //   escalated → rebuttal + oferta concreta (2da vez, misma categoría)
     //   pause     → cierre suave + pausa al admin (3ra vez — bot se rinde)
-    const objection = detectObjection(currentState.step, normalizedText, currentState, isMpEnabled(dependencies.config));
+    // Una pregunta de salud o de edad no es una objeción aunque diga
+    // "consultar": "Tengo 79 años, ¿puedo tomarlas o tengo que consultar a mi
+    // médico?" recibió "¡Dale, obvio! Te dejo el pedido reservado" (19-nov-2026).
+    // La contesta el paso, que tiene la regla de edad y las de salud.
+    const healthQuestion = dependencies.intent?.health === true
+        || /\b\d{2}\s*anos\b/.test(normalizedText)
+        || /\b(medic[oa]|doctor|doctora|cardiolog[oa]|clinic[oa]|nutricionista|endocrinolog[oa])\b/.test(normalizedText);
+    const objection = healthQuestion ? null : detectObjection(currentState.step, normalizedText, currentState, isMpEnabled(dependencies.config));
     if (objection) {
+        if (objection.type === 'postergar') currentState.deferredAt = Date.now();
         logger.info(`[OBJECTION] Intercepted "${objection.type}" for ${userId} at step ${currentState.step} (tier=${objection.tier})`);
         if (dependencies.sendMessageWithDelay) {
             await dependencies.sendMessageWithDelay(userId, objection.response);

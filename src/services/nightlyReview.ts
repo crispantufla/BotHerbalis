@@ -46,7 +46,7 @@ Tu trabajo es encontrar dónde el BOT falló. Marcá solo fallas reales y concre
 - El bot ofreció pagar al recibir a alguien de fuera de Rosario y alrededores, o le pidió datos de reparto a alguien de otra ciudad. Regla: reparto propio y pago al recibir solo en Rosario y hasta 60 km; al resto, Correo Argentino prepago.
 - El cliente escribió y nadie le respondió (el último mensaje de la charla es del cliente y pide algo).
 
-NO marques: que el cliente no haya comprado, que haya dejado de escribir después de una respuesta correcta, ni los mensajes de VENDEDOR (no evalúes lo que escribió una persona). Si una charla está bien, no la menciones.
+NO marques: que el cliente no haya comprado, que haya dejado de escribir después de una respuesta correcta, ni los mensajes de VENDEDOR (no evalúes lo que escribió una persona). Si después de un mensaje del cliente el que contesta es VENDEDOR, la charla la tomó una persona: lo que el bot no llegó a responder ahí NO es una falla del bot ni un "sin respuesta". Un sticker, una imagen o un "gracias" sueltos no piden nada. Si una charla está bien, no la menciones.
 
 Gravedad: "alta" si probablemente se perdió una venta o hay un tema de salud sin atender; "media" si la respuesta fue mala pero la charla siguió; "baja" si es un detalle.
 Escribí en castellano rioplatense, claro y sin tecnicismos.
@@ -93,7 +93,7 @@ export function parseReviewText(text: string): { resumen: string; hallazgos: Rev
 const ROLE: Record<string, string> = { user: 'CLIENTE', bot: 'BOT', admin: 'VENDEDOR', system: 'SISTEMA' };
 
 /** Arma el texto de las conversaciones del período, solo las que tienen algún mensaje del cliente. */
-export async function buildTranscript(sellerId: string, from: Date, to: Date, prismaClient?: any): Promise<{ text: string; conversaciones: number; mensajesDeClientes: number }> {
+export async function buildTranscript(sellerId: string, from: Date, to: Date, prismaClient?: any): Promise<{ text: string; conversaciones: number; mensajesDeClientes: number; ultimoEsCliente: string[] }> {
     const prisma = prismaClient || require('../../db').prisma;
     const logs = await prisma.chatLog.findMany({
         where: { instanceId: sellerId, timestamp: { gte: from, lt: to } },
@@ -106,11 +106,16 @@ export async function buildTranscript(sellerId: string, from: Date, to: Date, pr
         by.get(l.userPhone)!.push(l);
     }
     const blocks: string[] = [];
+    const ultimoEsCliente: string[] = [];
     let mensajesDeClientes = 0;
     for (const [phone, ls] of by) {
         const users = ls.filter((l) => l.role === 'user').length;
         if (!users) continue;
         mensajesDeClientes += users;
+        // Quién habló último (sin contar los avisos internos): si fue el bot o el
+        // vendedor, esa charla no puede estar "sin respuesta".
+        const lastSpoken = [...ls].reverse().find((l) => l.role !== 'system');
+        if (lastSpoken?.role === 'user') ultimoEsCliente.push(String(phone));
         const lines = ls.map((l) => {
             // Hora de Argentina (UTC-3), para que el informe coincida con lo que ve el vendedor.
             const hhmm = new Date(new Date(l.timestamp).getTime() - 3 * 3600_000).toISOString().slice(11, 16);
@@ -127,7 +132,7 @@ export async function buildTranscript(sellerId: string, from: Date, to: Date, pr
         blocks.shift();
         text = blocks.join('\n\n');
     }
-    return { text, conversaciones: blocks.length, mensajesDeClientes };
+    return { text, conversaciones: blocks.length, mensajesDeClientes, ultimoEsCliente };
 }
 
 /** Texto corto para WhatsApp: resumen + hallazgos, los graves primero. */
@@ -197,7 +202,10 @@ export async function runNightlyReview(
             mensajesDeClientes: t.mensajesDeClientes,
             resumen: parsed.resumen,
             hallazgos: parsed.hallazgos,
-            sinRespuesta: parsed.sinRespuesta,
+            // La lista la arma la IA, pero se queda solo con las charlas donde de
+            // verdad el último en hablar fue el cliente: el 22-nov-2026 marcó cinco
+            // teléfonos y los cinco tenían respuesta del bot o del vendedor.
+            sinRespuesta: parsed.sinRespuesta.filter((p) => t.ultimoEsCliente.includes(p)),
         };
         try {
             const dir = path.join(opts.dataDir || process.env.DATA_DIR || path.join(__dirname, '../..'), 'reviews', sellerId);

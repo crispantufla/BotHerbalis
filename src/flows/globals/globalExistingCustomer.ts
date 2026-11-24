@@ -15,7 +15,7 @@ import logger from '../../utils/logger';
  * post-venta (`completed`): el mensaje siguiente lo toma una persona, igual que
  * con cualquier comprador.
  */
-const ALREADY_BOUGHT = /\bya\s+(?:lo|la|las|los|les)?\s*(?:compre|adquiri|recibi)\b|\bya\s+(?:lo|la|las|los)\s+tengo\b(?!\s+(?:decidid|clar|pensad|vist))|\b(?:lo|la|las|los)\s+estoy\s+tomando\b|\bestoy\s+tomando(?:lo|la|las|los)\b|\bme\s+(?:lo|la|las|los)\s+trajeron\b|\bya\s+soy\s+client[ea]\b/;
+const ALREADY_BOUGHT = /\bya\s+(?:lo|la|las|los|les)?\s*(?:compre|adquiri|recibi)\b|\bya\s+(?:lo|la|las|los)\s+tengo\b(?!\s+(?:decidid|clar|pensad|vist))|\b(?:lo|la|las|los)\s+estoy\s+tomando\b|\bestoy\s+tomando(?:lo|la|las|los)\b|\bme\s+(?:lo|la|las|los)\s+trajeron\b|\b(?:ya|hoy|ayer|recien)\s+me\s+(?:llego|llegaron)\b|\bme\s+llegaron\s+(?:las|los)\b|\bya\s+soy\s+client[ea]\b/;
 // Vuelve a comprar: eso sí es una venta, y la maneja el flujo normal.
 const WANTS_MORE = /\b(quiero|quisiera|necesito|pedir|reponer|otro|otra|otra vez|de nuevo|mas|se me (termino|acabo|esta (terminando|acabando)))\b/;
 const SELLING_STEPS = new Set(['greeting', 'waiting_weight', 'waiting_preference', 'waiting_preference_consultation', 'waiting_plan_choice', 'waiting_zone', 'waiting_payment_method']);

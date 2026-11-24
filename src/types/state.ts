@@ -97,6 +97,9 @@ export interface UserState {
     // Mientras esté en true, no le re-pedimos datos ni lo apuramos: esperamos a que
     // vuelva con contenido sustantivo. Se limpia al recibir datos/algo concreto.
     awaitingResume?: boolean;
+    // Última vez que avisó que compra más adelante ("cuando cobre te aviso").
+    // Lo anota salesFlow; lo leen la toma de datos (no re-pedir) y el recordatorio.
+    deferredAt?: number | null;
     cartRecovered?: boolean;
     secondFollowUpSent?: boolean;
     cashRetryShown?: boolean; // [LEGACY] flujo anticipo $10k (deprecated may-2026)
