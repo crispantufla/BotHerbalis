@@ -39,7 +39,18 @@ const NO_CASH = /\bno\s+(?:puedo|tengo|manejo|uso|cuento\s+con|dispongo\s+de|me\
 // Rapipago/PagoFácil se siguen detectando como keyword (el cliente puede nombrarlas)
 // y se canalizan por el link de tarjeta de crédito, pero el bot ya NO las ofrece.
 const MP_KEYWORDS = /\b(mercadopago|mercado.?pago|\bmp\b|online|digital|qr|tarjeta|d[ée]bito|cr[ée]dito|pago online|pago digital|pago ahora|por mp|con mp|por mercadopago|aplicaci[óo]n|rapipago|pago\s*f[áa]cil|pagof[áa]cil)\b/i;
-const TRANSFER_KEYWORDS = /\b(transfer[ei]ncia|transf\b|transferir|alias|dep[óo]sito|deposito|banco|bancaria|cbu|cvu|por transferencia)\b/i;
+const TRANSFER_KEYWORDS = /\b(transfer[ei]ncia|transf\b|transferir|transfiero|alias|dep[óo]sito|deposito|banco|bancaria|cbu|cvu|por transferencia)\b/i;
+
+// "Mercado Pago" a secas NO es tarjeta (reporte del dueño, 17-jul-2026): quien
+// dice "pago por Mercado Pago" casi siempre quiere TRANSFERIR desde su cuenta
+// de Mercado Pago; el que quiere tarjeta lo dice. Sin otra pista se pregunta
+// cuál de las dos; con "transferencia" al lado, es transferencia. Sobre
+// normalizedText (sin tildes).
+const MP_BRAND = /\b(mercado\s?pago|mp)\b/;
+const CARD_EXPLICIT = /\b(tarjeta|credito|debito|link|qr|cuotas|rapipago|pago\s*facil|pagofacil|online|digital)\b/;
+export function mentionsMpBrandOnly(normalizedText: string): boolean {
+    return MP_BRAND.test(normalizedText) && !CARD_EXPLICIT.test(normalizedText);
+}
 
 // Verbos de decisión que convierten una frase con opción de envío en ELECCIÓN
 // aunque _isInfoQuestion la lea como pregunta. Caso real 5492215731759 (21-jul):
@@ -235,7 +246,7 @@ async function _handlePrepayObjection(
     currentState.paymentSubChoiceAsked = false;
     if (n === 1) {
         const tpl = getFlowTemplate('prepay_objection', knowledge, !mpOn) ||
-            `Te entiendo 😊 Durante 13 años mandamos todo por contrarreembolso, pero el Correo Argentino lo volvió lento y muy caro para el cliente. Por eso, fuera de Rosario y alrededores hoy trabajamos solo con pago anticipado: apenas se acredita, sale y te llega en *4 días hábiles* 🚚\n\n¿Avanzamos con ${prepayMeans(mpOn)}?`;
+            `Te entiendo 😊 Hace 13 años que enviamos por contrarreembolso, pero el Correo Argentino lo volvió lento y muy caro para el cliente. Por eso, fuera de Rosario y alrededores hoy trabajamos solo con pago anticipado: apenas se acredita, sale y te llega en *4 días hábiles* 🚚\n\n¿Avanzamos con ${prepayMeans(mpOn)}?`;
         saveState(userId);
         await sendMessageWithDelay(userId, _formatMessage(tpl, currentState));
         logger.info(`[PAYMENT_METHOD] ${userId} → objeción al prepago (${reason}), 1ª vez: argumento enviado.`);
@@ -323,7 +334,10 @@ export async function handleWaitingPaymentMethod(
     // modelo, sigue por el camino normal (mismo criterio que antes de sep-2026).
     const namesPrepay = MP_KEYWORDS.test(text) || TRANSFER_KEYWORDS.test(normalizedText);
     if (!alreadyPaidMp
-        && (PAY_ON_DELIVERY.test(normalizedText) || COD_REQUEST.test(normalizedText) || (PAY_AT_HOME.test(normalizedText) && !namesPrepay))
+        && (PAY_ON_DELIVERY.test(normalizedText) || COD_REQUEST.test(normalizedText) || (PAY_AT_HOME.test(normalizedText) && !namesPrepay
+                // "Sucursal o abonar envío a domicilio" compara las dos opciones
+                // de envío: lo contesta la rama de ambigüedad de más abajo.
+                && !(RETIRO_KEYWORDS.test(text) && DOMICILIO_KEYWORDS.test(text))))
         && !NO_CASH.test(normalizedText)) {
         logger.info(`[PAYMENT_METHOD] ${userId} → pide pago al recibir fuera de zona ("${text.slice(0, 50)}").`);
         return await _handlePrepayObjection(userId, text, currentState, knowledge, dependencies, 'pago al recibir');
@@ -355,8 +369,12 @@ export async function handleWaitingPaymentMethod(
     // Negación dirigida a un medio de pago (ver _negatesOption arriba): la usan
     // el submenú MP/Transferencia y el atajo de medio directo para NO elegir la
     // opción que el cliente está rechazando.
-    const mpNegated = _negatesOption(normalizedText, MP_KEYWORDS);
     const transferNegated = _negatesOption(normalizedText, TRANSFER_KEYWORDS);
+    // "transfiero por Mercado Pago": la marca junto a la transferencia no es
+    // pedir tarjeta. Se trata como si la tarjeta estuviera descartada.
+    const brandOnly = mentionsMpBrandOnly(normalizedText);
+    const mpNegated = _negatesOption(normalizedText, MP_KEYWORDS)
+        || (brandOnly && TRANSFER_KEYWORDS.test(normalizedText) && !transferNegated);
 
     // ── Soft bailout / dilación (rev. 2026-05-30 reportes horacio) ─────────────
     // Cliente dice "gracias, voy a ver", "lo pienso", "me comunico", "ahora
@@ -411,6 +429,22 @@ export async function handleWaitingPaymentMethod(
         await sendMessageWithDelay(userId, msg);
         logger.info(`[PAYMENT_METHOD] ${userId} → nombró AMBAS opciones (retiro + domicilio) sin decidir — re-pregunto en vez de asumir.`);
         return { matched: true };
+    }
+
+    // ── "Mercado Pago" sin decir tarjeta ni transferencia ──────────────────────
+    // (ver MP_BRAND arriba). No se manda el link: se pregunta cuál de las dos.
+    // Si el cliente lo repite después de la pregunta, sigue el camino de siempre.
+    if (mpOn && !alreadyPaidMp && !optionNum && brandOnly && !mpNegated
+        && !TRANSFER_KEYWORDS.test(normalizedText)) {
+        const msg = '¡Sí! 😊 Por Mercado Pago lo podés abonar de dos formas:\n\n1️⃣ *Tarjeta de crédito* — te envío un *link de pago*\n2️⃣ *Transferencia* desde tu cuenta — te paso el *alias*\n\n¿Cuál preferís?';
+        if (!_isDuplicate(msg, currentState.history)) {
+            if (!currentState.shippingChoice) currentState.shippingChoice = 'domicilio';
+            currentState.paymentSubChoiceAsked = true;
+            saveState(userId);
+            await sendMessageWithDelay(userId, msg);
+            logger.info(`[PAYMENT_METHOD] ${userId} → nombró Mercado Pago sin decir tarjeta ni transferencia — pregunto cuál.`);
+            return { matched: true };
+        }
     }
 
     // ── Sub-menú: el cliente ya eligió domicilio, ahora elige MP o Transferencia
@@ -663,7 +697,7 @@ export async function handleWaitingPaymentMethod(
         step: 'waiting_payment_method',
         goal: `El cliente está FUERA de la zona de reparto propio (Rosario y 60 km): su pedido va por *Correo Argentino*, SIN costo y SIEMPRE PREPAGO, y llega en *4 días hábiles* desde que se acredita el pago. Tiene que elegir DÓNDE recibirlo y CÓMO abonar:\n\n1️⃣ *Envío a domicilio*\n2️⃣ *Retiro en sucursal* de Correo Argentino (la asigna el Correo por el código postal, se retira con DNI)\n\nMedios (los dos envíos igual): ${mpOn
             ? `*tarjeta de crédito* (link de pago protegido) o *transferencia bancaria* al alias *HERBALIS.TIENDA* (BIO ORIGEN S.A.S.). No ofrezcas débito, Pago Fácil ni Rapipago.`
-            : `*transferencia bancaria* al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*.\n\n🛑 EL PAGO CON TARJETA ESTÁ FUERA DE SERVICIO EN ESTOS DÍAS: NO lo ofrezcas ni lo menciones ("tarjeta", "link de pago", "Mercado Pago", débito, Pago Fácil, Rapipago). Si lo pide, decile con naturalidad que justo no está disponible y ofrecele la transferencia. No inventes motivos ni prometas cuándo vuelve.`}\n\nPROHIBICIONES ESTRICTAS:\n- NO ofrecer pago al recibir, contrarreembolso ni efectivo al cartero o en la sucursal: fuera de Rosario y alrededores NO existe. Si lo pide, explicá con calidez que hace 13 años enviábamos contrarreembolso pero el Correo Argentino tomó medidas que lo volvieron lento y muy caro para el cliente, por eso hoy va prepago y llega en 4 días; después ofrecé ${prepayMeans(mpOn)}.\n- NO mencionar anticipo de $10.000 ni adicional de $6.000 (no existen)\n- NO mencionar cuotas\n- NO inventar aliases distintos al oficial\n- NO hablar de reparto propio ni de "te lo llevamos nosotros": eso es solo para Rosario y 60 km, y este cliente no está ahí.\n\nSi el cliente responde con afirmativa genérica ("dale", "sí") sin aclarar, pedile que elija domicilio o sucursal. NUNCA avances sin que confirme cuál de las 2.\n\nSi DESCONFÍA de pagar por adelantado ("no me gustan las transferencias", "me da miedo pagar antes"): ${mpOn ? 'ofrecé la tarjeta de crédito: el link es protegido y si hay un problema con el envío le devuelven la plata' : 'recordale los 13 años y los 70.000 clientes'}. No prometas pago al recibir.\n\nSi el cliente PREGUNTA algo (cuánto tarda, cómo se paga, dónde retira, etc.) en vez de elegir: RESPONDÉ su pregunta reaclarando la info aunque YA se la hayas dicho antes (los clientes repreguntan y no se acuerdan), y RECIÉN DESPUÉS re-preguntá si prefiere domicilio o sucursal. NUNCA mandes el link de pago ni avances mientras el cliente siga preguntando.
+            : `*transferencia bancaria* al alias *HERBALIS.TIENDA* a nombre de *BIO ORIGEN S.A.S.*.\n\n🛑 EL PAGO CON TARJETA ESTÁ FUERA DE SERVICIO EN ESTOS DÍAS: NO lo ofrezcas ni lo menciones ("tarjeta", "link de pago", "Mercado Pago", débito, Pago Fácil, Rapipago). Si lo pide, decile con naturalidad que justo no está disponible y ofrecele la transferencia. No inventes motivos ni prometas cuándo vuelve.`}\n\nPROHIBICIONES ESTRICTAS:\n- NO ofrecer pago al recibir, contrarreembolso ni efectivo al cartero o en la sucursal: fuera de Rosario y alrededores NO existe. Si lo pide, explicá con calidez que hace 13 años que enviamos por contrarreembolso pero el Correo Argentino tomó medidas que lo volvieron lento y muy caro para el cliente, por eso hoy va prepago y llega en 4 días; después ofrecé ${prepayMeans(mpOn)}.\n- NO mencionar anticipo de $10.000 ni adicional de $6.000 (no existen)\n- NO mencionar cuotas\n- NO inventar aliases distintos al oficial\n- NO hablar de reparto propio ni de "te lo llevamos nosotros": eso es solo para Rosario y 60 km, y este cliente no está ahí.\n\nSi el cliente responde con afirmativa genérica ("dale", "sí") sin aclarar, pedile que elija domicilio o sucursal. NUNCA avances sin que confirme cuál de las 2.\n\nSi DESCONFÍA de pagar por adelantado ("no me gustan las transferencias", "me da miedo pagar antes"): ${mpOn ? 'ofrecé la tarjeta de crédito: el link es protegido y si hay un problema con el envío le devuelven la plata' : 'recordale los 13 años y los 70.000 clientes'}. No prometas pago al recibir.\n\nSi el cliente PREGUNTA algo (cuánto tarda, cómo se paga, dónde retira, etc.) en vez de elegir: RESPONDÉ su pregunta reaclarando la info aunque YA se la hayas dicho antes (los clientes repreguntan y no se acuerdan), y RECIÉN DESPUÉS re-preguntá si prefiere domicilio o sucursal. NUNCA mandes el link de pago ni avances mientras el cliente siga preguntando.${mpOn ? '\n\nSi nombra "Mercado Pago" sin decir tarjeta: NO asumas tarjeta, casi siempre quiere transferir desde su cuenta de Mercado Pago. Preguntale si prefiere el link de tarjeta o el alias para transferir.' : ''}
 
 TAG DE ELECCIÓN (para el sistema): si con este mensaje el cliente ELIGE claramente dónde recibirlo — aunque lo diga como comentario (ej: "me conviene ir a la sucursal del correo" = retiro) — incluí en extractedData exactamente "ENVIO: retiro" o "ENVIO: domicilio" (sin tilde), y tu respuesta debe avanzar acorde: confirmá dónde lo recibe y ${mpOn ? 'ofrecé 1️⃣ Tarjeta de crédito / 2️⃣ Transferencia bancaria' : 'pasale el alias *HERBALIS.TIENDA* (BIO ORIGEN S.A.S.) para que transfiera el total'}. Emití el tag SOLO cuando tu propia respuesta esté avanzando con esa opción — si el cliente solo pregunta, compara o duda, respondé la duda, re-preguntá cuál prefiere y NO emitas el tag.`,
         history: currentState.history,

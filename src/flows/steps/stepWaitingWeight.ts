@@ -147,6 +147,8 @@ export async function handleWaitingWeight(
         // equivoqué", "Gracias por responderme" y una invitación de Temu.
         const mentionsOffer = /\b(precios?|cuanto|sale|cuesta|valor|costo|got\w*|capsul\w*|semill\w*|pastill\w*|kilos?|kg|info\w*)\b/.test(normalizedText);
         if (/(https?:\/\/|www\.)\S+/i.test(text) && !mentionsOffer) {
+            currentState.cartRecovered = true; // tampoco el recordatorio del día siguiente
+            saveState(userId);
             logger.info(`[CLUB-PRECIOS] ${userId} mandó un enlace ("${text.slice(0, 50)}") → no es una consulta, no respondo.`);
             return { matched: true };
         }

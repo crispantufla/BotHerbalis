@@ -133,7 +133,10 @@ export async function handleWaitingTransferConfirmation(
     }
 
     // ── Cliente cambia a MercadoPago ───────────────────────────────────────────
-    if (MP_KEYWORDS.test(text) && !/\btransfer/i.test(text)) {
+    // "Mercado Pago" a secas no es pedir tarjeta: con el alias ya enviado, quien
+    // dice "te pago por Mercado Pago" está por transferir desde ahí.
+    const { mentionsMpBrandOnly } = require('./stepWaitingPaymentMethod');
+    if (MP_KEYWORDS.test(text) && !/\btransfer/i.test(text) && !mentionsMpBrandOnly(normalizedText)) {
         // Interruptor de MP apagado (jul-2026): no lo reencauzamos a
         // waiting_payment_method — iría a dar la vuelta para terminar diciéndole
         // lo mismo. Se lo decimos acá y le dejamos las dos formas vivas.

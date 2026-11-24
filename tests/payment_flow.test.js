@@ -306,7 +306,7 @@ describe('Ambigüedad de envío — nombra LAS DOS opciones (caso 5493815010702)
         expect(state.step).toBe('waiting_payment_method');
         // Debe re-preguntar cuál de las dos.
         const sent = mockSend.mock.calls.map(c => c[1]).join('\n');
-        expect(sent).toMatch(/dos opciones|con cu[áa]l/i);
+        expect(sent).toMatch(/Son dos opciones/i);
     });
 
     test('"sucursal" sola → retiro (no ambiguo, sigue funcionando)', async () => {
@@ -337,7 +337,7 @@ describe('Desconfía del pago anticipado → argumento del dueño, sin pago al r
         expect(state.prepayObjections).toBe(1);
         const sent = mockSend.mock.calls.map(([, m]) => m).join(' ');
         expect(sent).toMatch(/13 años/);
-        expect(sent).toMatch(/tarjeta de crédito/i);
+        expect(sent).toMatch(/link de tarjeta/i);
         expect(sent).not.toMatch(/retiro en sucursal.*efectivo|efectivo cuando lo retir/i);
     });
 
@@ -477,9 +477,11 @@ describe('Menú envío → Envío a domicilio (opción 1) + submenú prepago', (
         expect(r.staleReprocess).toBe(true);
     });
 
-    test('[3.5] Submenú "mercadopago" → MP', async () => {
+    // Desde el 24-nov-2026 "mercadopago" a secas no es tarjeta: se pregunta
+    // (ver el describe '"Mercado Pago" sin decir tarjeta ni transferencia').
+    test('[3.5] Submenú "tarjeta por mercadopago" → MP', async () => {
         const state = makePaymentState('60', { shippingChoice: 'domicilio', paymentSubChoiceAsked: true });
-        await handleWaitingPaymentMethod('d5', 'mercadopago', 'mercadopago', state, knowledge, deps);
+        await handleWaitingPaymentMethod('d5', 'tarjeta por mercadopago', 'tarjeta por mercadopago', state, knowledge, deps);
         expect(state.paymentMethod).toBe('mercadopago');
         expect(state.step).toBe('waiting_mp_payment');
     });
@@ -589,19 +591,20 @@ describe('waiting_transfer_confirmation → cliente pide retiro en sucursal', ()
 // ════════════════════════════════════════════════════════════════════════════
 describe('Atajos de pago (sin elegir envío explícito → asume domicilio)', () => {
 
-    test('[4.1] "mercadopago" → domicilio + MP', async () => {
+    test('[4.1] "link de mercadopago" → domicilio + MP', async () => {
         const state = makePaymentState('60');
-        await handleWaitingPaymentMethod('a1', 'mercadopago', 'mercadopago', state, knowledge, deps);
+        await handleWaitingPaymentMethod('a1', 'link de mercadopago', 'link de mercadopago', state, knowledge, deps);
         expect(state.shippingChoice).toBe('domicilio');
         expect(state.paymentMethod).toBe('mercadopago');
         expect(state.step).toBe('waiting_mp_payment');
     });
 
-    test('[4.2] "mp" → MP', async () => {
+    test('[4.2] "mp" a secas → pregunta tarjeta o transferencia, sin link', async () => {
         const state = makePaymentState('60');
         await handleWaitingPaymentMethod('a2', 'mp', 'mp', state, knowledge, deps);
-        expect(state.paymentMethod).toBe('mercadopago');
-        expect(state.step).toBe('waiting_mp_payment');
+        expect(state.paymentMethod).toBeFalsy();
+        expect(state.step).toBe('waiting_payment_method');
+        expect(state.paymentSubChoiceAsked).toBe(true);
     });
 
     test('[4.3] MP NO setea senaAmount (siempre por el total)', async () => {
@@ -1139,5 +1142,63 @@ describe('mpPushConfirm — confirmación push al acreditarse el pago', () => {
         expect(mockSaveOrder).toHaveBeenCalledTimes(1);
         const closedCalls = mockNotify.mock.calls.filter(([title]) => /VENTA CERRADA/i.test(title));
         expect(closedCalls.length).toBe(1);
+    });
+});
+
+// Reporte del dueño (17-jul-2026): "Mercado Pago" a secas no es pedir tarjeta.
+describe('"Mercado Pago" sin decir tarjeta ni transferencia', () => {
+    beforeEach(() => { mockSend.mockClear(); mockPauseUsers.clear(); });
+
+    test('"Mercado pago reciben" pregunta cuál de las dos y NO manda el link', async () => {
+        const state = makePaymentState('60', { partialAddress: {} });
+        const t = 'mercado pago reciben';
+        const res = await handleWaitingPaymentMethod('5491100000001@c.us', t, t, state, knowledge, deps);
+        expect(res.matched).toBe(true);
+        expect(state.step).toBe('waiting_payment_method');
+        expect(state.paymentMethod).toBeFalsy();
+        expect(state.paymentSubChoiceAsked).toBe(true);
+        const sent = mockSend.mock.calls.map(c => c[1]).join('\n');
+        expect(sent).toMatch(/Tarjeta de crédito/);
+        expect(sent).toMatch(/alias/);
+        expect(sent).not.toMatch(/te paso el link de pago/i);
+    });
+
+    test('después de la pregunta, "transferencia" recibe el alias y "tarjeta" el link', async () => {
+        const a = makePaymentState('60', { partialAddress: {} });
+        await handleWaitingPaymentMethod('5491100000002@c.us', 'pago por mercado pago', 'pago por mercado pago', a, knowledge, deps);
+        a.history.push({ role: 'bot', content: mockSend.mock.calls[0][1] });
+        mockSend.mockClear();
+        await handleWaitingPaymentMethod('5491100000002@c.us', 'transferencia', 'transferencia', a, knowledge, deps);
+        expect(a.step).toBe('waiting_transfer_confirmation');
+        expect(mockSend.mock.calls.map(c => c[1]).join('\n')).toMatch(/HERBALIS\.TIENDA/);
+
+        const b = makePaymentState('60', { partialAddress: {} });
+        await handleWaitingPaymentMethod('5491100000003@c.us', 'por mp', 'por mp', b, knowledge, deps);
+        await handleWaitingPaymentMethod('5491100000003@c.us', 'con tarjeta', 'con tarjeta', b, knowledge, deps);
+        expect(b.paymentMethod).toBe('mercadopago');
+        expect(b.step).toBe('waiting_mp_payment');
+    });
+
+    test('"te transfiero por mercado pago" es transferencia, no tarjeta', async () => {
+        const state = makePaymentState('60', { partialAddress: {} });
+        const t = 'te transfiero por mercado pago';
+        await handleWaitingPaymentMethod('5491100000004@c.us', t, t, state, knowledge, deps);
+        expect(state.paymentMethod).not.toBe('mercadopago');
+        expect(state.step).toBe('waiting_transfer_confirmation');
+    });
+
+    test('"tarjeta por mercado pago" sigue yendo al link', async () => {
+        const state = makePaymentState('60', { partialAddress: {} });
+        const t = 'con tarjeta por mercado pago';
+        await handleWaitingPaymentMethod('5491100000005@c.us', t, t, state, knowledge, deps);
+        expect(state.paymentMethod).toBe('mercadopago');
+    });
+
+    test('con el alias ya enviado, "te pago por mercado pago" no cambia a tarjeta', async () => {
+        const state = makePaymentState('60', { step: 'waiting_transfer_confirmation', paymentMethod: 'transferencia', correoOrderSaved: true });
+        const t = 'dale te pago por mercado pago';
+        await handleWaitingTransferConfirmation('5491100000006@c.us', t, t, state, knowledge, deps);
+        expect(state.step).not.toBe('waiting_payment_method');
+        expect(state.step).not.toBe('waiting_mp_payment');
     });
 });

@@ -193,6 +193,10 @@ Entraron el 2026-11-12, tras revisar a mano las charlas del guion por zona:
     o más) o dicha con pregunta no recibe el "¡Anotado! Seguimos..." de la extracción silenciosa.
   - `waiting_mp_payment`: el segundo "ya pagué" sin pago acreditado pausa y lo verifica una
     persona; hablar del pago no dispara `detectObjection` ("seguro que se acreditó").
+  - **"Mercado Pago" a secas no es tarjeta** (reporte del dueño del 17-jul, arreglado el 24-nov):
+    `mentionsMpBrandOnly` en `stepWaitingPaymentMethod`. Sin "tarjeta/link/crédito" al lado se
+    pregunta tarjeta o transferencia; con "transferencia" al lado es transferencia. Tests en
+    `payment_flow.test.js`.
   - Un lugar lejano dicho con contexto gana sobre un barrio de Rosario ("soy de Córdoba capital,
     barrio Alberdi"), salvo que vaya seguido de un número (calle).
 
