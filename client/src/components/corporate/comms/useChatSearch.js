@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import api from '../../../config/axios';
 
 // Búsqueda de chats del sidebar: mientras se tipea filtra al instante los chats
@@ -39,7 +39,9 @@ export function useChatSearch(chats) {
     //   - mientras espera el backend → filter client-side instantáneo
     //   - con resultados → merge: backend primero (con snippet) + memoria que matcheó
     //     pero no apareció en backend (clientes manuales sin User en DB).
-    const filteredChats = (() => {
+    // Memoizada: la lista (y cada chat enriquecido) conserva su identidad entre
+    // renders, que es lo que deja a las filas del sidebar saltearse el render.
+    const filteredChats = useMemo(() => {
         const term = searchTerm.trim();
         if (!term) return chats;
 
@@ -69,7 +71,7 @@ export function useChatSearch(chats) {
         });
         const inMemOnly = inMemMatches.filter(c => !backendIds.has(c.id));
         return [...enrichedBackend, ...inMemOnly];
-    })();
+    }, [chats, searchTerm, searchResults]);
 
     return { searchTerm, setSearchTerm, searchResults, isSearching, filteredChats };
 }

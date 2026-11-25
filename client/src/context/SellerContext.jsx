@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../config/axios';
 import { useAuth } from './AuthContext';
 import { useSocket } from './SocketContext';
@@ -81,19 +81,22 @@ export const SellerProvider = ({ children }) => {
 
     // Merge presence into sellers list for consumers
     // sellerPresence[sellerId] = 'online' | 'idle' | undefined (offline)
-    const sellersWithPresence = sellers.map(s => ({
-        ...s,
-        webPresence: sellerPresence[s.sellerId] || 'offline', // 'online' | 'idle' | 'offline'
-    }));
-
-    return (
-        <SellerContext.Provider value={{
+    const value = useMemo(() => {
+        const sellersWithPresence = sellers.map(s => ({
+            ...s,
+            webPresence: sellerPresence[s.sellerId] || 'offline', // 'online' | 'idle' | 'offline'
+        }));
+        return {
             sellers: sellersWithPresence,
             selectedSellerId,
             setSelectedSellerId,
             selectedSeller: sellersWithPresence.find(s => s.sellerId === selectedSellerId) || null,
             loadSellers,
-        }}>
+        };
+    }, [sellers, sellerPresence, selectedSellerId, setSelectedSellerId, loadSellers]);
+
+    return (
+        <SellerContext.Provider value={value}>
             {children}
         </SellerContext.Provider>
     );

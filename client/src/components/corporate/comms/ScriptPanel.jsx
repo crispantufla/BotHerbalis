@@ -4,6 +4,8 @@ import { Button, IconButton, Card, Badge, EmptyState, cn } from '../../ui';
 
 // Drawer derecho: contexto IA (resumen) + script sugerido (steps clickeables)
 // + botones de completion manual (con/sin enviar mensaje al cliente).
+// Por debajo de `lg` se superpone a la conversación (en tablet, empujarla la
+// dejaba en ~150px); de `lg` para arriba ocupa su columna.
 //
 // Props:
 //   onClose() — cerrar el drawer
@@ -25,7 +27,7 @@ export default function ScriptPanel({
     onManualComplete,
 }) {
     return (
-        <div className="w-full md:w-[340px] flex-shrink-0 border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex flex-col z-30 md:relative absolute right-0 top-0 bottom-0 overflow-hidden animate-fade-in shadow-elevated">
+        <div className="w-full md:w-[340px] flex-shrink-0 border-l border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex flex-col z-30 absolute lg:relative right-0 top-0 bottom-0 overflow-hidden animate-fade-in motion-reduce:animate-none shadow-elevated">
             <div className="p-4 border-b border-slate-200 dark:border-slate-700 flex justify-between items-center bg-white dark:bg-slate-800 flex-shrink-0">
                 <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm flex items-center gap-2">
                     <Bot className="w-4 h-4 text-accent-600 dark:text-accent-400" aria-hidden="true" />

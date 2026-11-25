@@ -3,12 +3,21 @@ import { Send, Paperclip, Smile, Zap, CreditCard, FileText } from 'lucide-react'
 import QuickRepliesPanel from './QuickRepliesPanel';
 import MpLinkPanel from './MpLinkPanel';
 import LazyBoundary from '../../ui/LazyBoundary';
+import { useToast } from '../../ui/Toast';
 
 // El selector de emojis (~300 KB con sus datos) se descarga la primera vez que se abre.
 const EmojiPicker = lazy(() => import('emoji-picker-react'));
 
 // Alto máximo de la caja de mensaje (igual a max-h-40); pasado eso, scrollea.
 const MAX_INPUT_HEIGHT = 160;
+
+// Botones de la fila: 44px en móvil (objetivo táctil), 48px desde `sm`.
+const TOOL_BTN = 'w-11 h-11 sm:w-12 sm:h-12 items-center justify-center shrink-0 rounded-xl sm:rounded-2xl border transition-colors shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500';
+const TOOL_IDLE = 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:bg-accent-50 dark:hover:bg-slate-600';
+const TOOL_IDLE_ACCENT = `${TOOL_IDLE} hover:text-accent-600 dark:hover:text-accent-400 hover:border-accent-300`;
+const TOOL_ON_ACCENT = 'bg-accent-50 dark:bg-slate-600 border-accent-300 dark:border-accent-500/50 text-accent-600 dark:text-accent-400';
+const TOOL_IDLE_SUCCESS = 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-success-600 dark:hover:text-success-500 hover:border-success-500/50 hover:bg-success-50 dark:hover:bg-slate-600';
+const TOOL_ON_SUCCESS = 'bg-success-50 dark:bg-slate-600 border-success-500/50 text-success-600 dark:text-success-500';
 
 const ChatInputArea = ({
     input,
@@ -20,6 +29,7 @@ const ChatInputArea = ({
     sendingMedia,
     chatId
 }) => {
+    const { toast } = useToast();
     const fileInputRef = useRef(null);
     const textareaRef = useRef(null);
     const [showEmojiPicker, setShowEmojiPicker] = useState(false);
@@ -45,12 +55,14 @@ const ChatInputArea = ({
         const isImage = file.type.startsWith('image/');
         const isPdf = file.type === 'application/pdf';
         if (!isImage && !isPdf) {
-            alert('Solo imágenes o PDFs');
+            toast.warning('Solo se pueden adjuntar imágenes o PDFs');
+            e.target.value = '';
             return;
         }
         const MAX_PDF_MB = 16;
         if (isPdf && file.size > MAX_PDF_MB * 1024 * 1024) {
-            alert(`El PDF supera el límite de ${MAX_PDF_MB}MB`);
+            toast.warning(`El PDF supera el límite de ${MAX_PDF_MB} MB`);
+            e.target.value = '';
             return;
         }
         const reader = new FileReader();
@@ -72,6 +84,11 @@ const ChatInputArea = ({
         setInput(prev => prev + emojiObject.emoji);
     };
 
+    // En el teléfono, mientras se escribe, el link de MP y el adjunto se
+    // esconden para darle el ancho a la caja (con los tres botones quedaba en
+    // ~126px a 375). Vuelven apenas la caja queda vacía.
+    const typing = (input || '').trim().length > 0;
+
     return (
         <div className="flex-shrink-0 p-3 sm:px-6 sm:py-4 pb-[max(1rem,env(safe-area-inset-bottom))] lg:pb-4 bg-white dark:bg-slate-800 border-t border-slate-200 dark:border-slate-800 z-20 relative">
             {showQuickReplies && (
@@ -92,7 +109,7 @@ const ChatInputArea = ({
             )}
 
             {showEmojiPicker && (
-                <div className="absolute bottom-full left-4 sm:left-6 mb-2 z-50 shadow-2xl rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 animate-fade-in origin-bottom-left">
+                <div className="absolute bottom-full left-4 sm:left-6 mb-2 z-50 shadow-2xl rounded-2xl overflow-hidden border border-slate-200 dark:border-slate-700 animate-fade-in motion-reduce:animate-none origin-bottom-left">
                     <LazyBoundary fallback={<p className="w-[320px] p-4 text-xs text-slate-500 dark:text-slate-400 bg-white dark:bg-slate-800">No se pudieron cargar los emojis. Recargá la página.</p>}>
                         <Suspense fallback={<div className="w-[320px] h-[400px] bg-white dark:bg-slate-800" />}>
                             <EmojiPicker
@@ -110,13 +127,13 @@ const ChatInputArea = ({
             )}
 
             {attachment && (
-                <div className="mb-2 p-3 sm:p-4 bg-white dark:bg-slate-800/80 rounded-2xl border border-indigo-100 dark:border-indigo-900/40 shadow-sm flex items-center gap-3 sm:gap-4">
+                <div className="mb-2 p-3 sm:p-4 bg-white dark:bg-slate-800/80 rounded-2xl border border-accent-100 dark:border-accent-900/40 shadow-sm flex items-center gap-3 sm:gap-4">
                     {attachment.kind === 'pdf' ? (
-                        <div className="w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center rounded-xl bg-rose-50 dark:bg-rose-900/30 text-rose-500 dark:text-rose-400 shrink-0">
-                            <FileText className="w-6 h-6 sm:w-8 sm:h-8" />
+                        <div className="w-12 h-12 sm:w-16 sm:h-16 flex items-center justify-center rounded-xl bg-danger-50 dark:bg-danger-900/30 text-danger-500 shrink-0">
+                            <FileText className="w-6 h-6 sm:w-8 sm:h-8" aria-hidden="true" />
                         </div>
                     ) : (
-                        <img src={attachment.preview} alt="Preview" className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-xl" />
+                        <img src={attachment.preview} alt="Vista previa del adjunto" className="w-12 h-12 sm:w-16 sm:h-16 object-cover rounded-xl" />
                     )}
                     <div className="flex-1 min-w-0">
                         <p className="font-bold text-slate-800 dark:text-slate-200 text-sm truncate">{attachment.file.name}</p>
@@ -124,26 +141,28 @@ const ChatInputArea = ({
                             {attachment.kind === 'pdf' ? 'PDF · ' : ''}{(attachment.file.size / 1024).toFixed(0)} KB
                         </p>
                     </div>
-                    <button type="button" onClick={() => setAttachment(null)} className="p-2 bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-rose-100 dark:hover:bg-rose-900/50 hover:text-rose-600 dark:hover:text-rose-400 rounded-xl transition-colors shrink-0">✕</button>
+                    <button type="button" aria-label="Quitar adjunto" title="Quitar adjunto" onClick={() => setAttachment(null)} className="w-11 h-11 sm:w-9 sm:h-9 flex items-center justify-center bg-slate-100 dark:bg-slate-700 text-slate-500 dark:text-slate-300 hover:bg-danger-100 dark:hover:bg-danger-900/50 hover:text-danger-600 dark:hover:text-danger-500 rounded-xl transition-colors shrink-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-danger-500"><span aria-hidden="true">✕</span></button>
                 </div>
             )}
-            <form onSubmit={attachment ? (e) => { e.preventDefault(); handleSendMedia(); } : handleSend} className="flex gap-1 sm:gap-3 items-end w-full">
+            <form onSubmit={attachment ? (e) => { e.preventDefault(); handleSendMedia(); } : handleSend} className="flex gap-1.5 sm:gap-3 items-end w-full">
                 <input ref={fileInputRef} type="file" accept="image/*,application/pdf" onChange={handleFileSelect} className="hidden" />
 
-                <button type="button" onClick={() => { setShowEmojiPicker(prev => !prev); setShowQuickReplies(false); }} className={`w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl border transition-all shadow-sm ${showEmojiPicker ? 'bg-indigo-50 dark:bg-slate-600 border-indigo-300 dark:border-indigo-500/50 text-indigo-600 dark:text-indigo-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-600'}`}>
-                    <Smile className="w-4 h-4 sm:w-5 sm:h-5" />
+                {/* Emojis: desde `sm`. En el teléfono los da el teclado y el botón le
+                    sacaba ancho a la caja de mensaje (a 360px quedaban ~95px). */}
+                <button type="button" aria-label="Emojis" title="Emojis" aria-expanded={showEmojiPicker} onClick={() => { setShowEmojiPicker(prev => !prev); setShowQuickReplies(false); setShowMpLink(false); }} className={`hidden sm:flex ${TOOL_BTN} ${showEmojiPicker ? TOOL_ON_ACCENT : TOOL_IDLE_ACCENT}`}>
+                    <Smile className="w-5 h-5" aria-hidden="true" />
                 </button>
 
-                <button type="button" onClick={() => { setShowQuickReplies(prev => !prev); setShowEmojiPicker(false); setShowMpLink(false); }} title="Respuestas rápidas" className={`w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl border transition-all shadow-sm ${showQuickReplies ? 'bg-indigo-50 dark:bg-slate-600 border-indigo-300 dark:border-indigo-500/50 text-indigo-600 dark:text-indigo-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-600'}`}>
-                    <Zap className="w-4 h-4 sm:w-5 sm:h-5" />
+                <button type="button" aria-label="Respuestas rápidas" title="Respuestas rápidas" aria-expanded={showQuickReplies} onClick={() => { setShowQuickReplies(prev => !prev); setShowEmojiPicker(false); setShowMpLink(false); }} className={`flex ${TOOL_BTN} ${showQuickReplies ? TOOL_ON_ACCENT : TOOL_IDLE_ACCENT}`}>
+                    <Zap className="w-5 h-5" aria-hidden="true" />
                 </button>
 
-                <button type="button" onClick={() => { setShowMpLink(prev => !prev); setShowEmojiPicker(false); setShowQuickReplies(false); }} title="Enviar link de MercadoPago" className={`w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl border transition-all shadow-sm ${showMpLink ? 'bg-emerald-50 dark:bg-slate-600 border-emerald-300 dark:border-emerald-500/50 text-emerald-600 dark:text-emerald-400' : 'bg-white dark:bg-slate-700 border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-emerald-600 dark:hover:text-emerald-400 hover:border-emerald-300 hover:bg-emerald-50 dark:hover:bg-slate-600'}`}>
-                    <CreditCard className="w-4 h-4 sm:w-5 sm:h-5" />
+                <button type="button" aria-label="Enviar link de MercadoPago" title="Enviar link de MercadoPago" aria-expanded={showMpLink} onClick={() => { setShowMpLink(prev => !prev); setShowEmojiPicker(false); setShowQuickReplies(false); }} className={`${typing ? 'hidden sm:flex' : 'flex'} ${TOOL_BTN} ${showMpLink ? TOOL_ON_SUCCESS : TOOL_IDLE_SUCCESS}`}>
+                    <CreditCard className="w-5 h-5" aria-hidden="true" />
                 </button>
 
-                <button type="button" onClick={() => fileInputRef.current?.click()} className="w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 text-slate-500 dark:text-slate-300 hover:text-indigo-600 dark:hover:text-indigo-400 hover:border-indigo-300 hover:bg-indigo-50 dark:hover:bg-slate-600 transition-all shadow-sm">
-                    <Paperclip className="w-4 h-4 sm:w-5 sm:h-5" />
+                <button type="button" aria-label="Adjuntar imagen o PDF" title="Adjuntar imagen o PDF" onClick={() => fileInputRef.current?.click()} className={`${typing ? 'hidden sm:flex' : 'flex'} ${TOOL_BTN} ${TOOL_IDLE_ACCENT}`}>
+                    <Paperclip className="w-5 h-5" aria-hidden="true" />
                 </button>
 
                 <textarea
@@ -165,10 +184,11 @@ const ChatInputArea = ({
                     }}
                     enterKeyHint="send"
                     placeholder="Mensaje..."
-                    className="block w-full min-w-0 flex-1 resize-none max-h-40 overflow-y-auto bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl sm:rounded-2xl px-3 sm:px-6 py-2 sm:py-4 text-slate-800 dark:text-slate-200 font-medium leading-snug focus:ring-4 focus:ring-indigo-500/20 focus:border-indigo-400 outline-none transition-[border-color,box-shadow] shadow-inner placeholder:text-slate-400 dark:placeholder:text-slate-500 text-[15px] sm:text-base"
+                    aria-label="Mensaje"
+                    className="block w-full min-w-0 flex-1 resize-none max-h-40 overflow-y-auto bg-white dark:bg-slate-700 border border-slate-200 dark:border-slate-600 rounded-xl sm:rounded-2xl px-3 sm:px-6 py-2.5 sm:py-4 text-slate-800 dark:text-slate-200 font-medium leading-snug focus:ring-4 focus:ring-accent-500/20 focus:border-accent-400 outline-none transition-[border-color,box-shadow] shadow-inner placeholder:text-slate-400 dark:placeholder:text-slate-500 text-base"
                 />
-                <button type="submit" disabled={!canSend} className="w-9 h-9 sm:w-12 sm:h-12 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl bg-gradient-to-br from-indigo-500 to-purple-600 text-white shadow-lg shadow-indigo-500/30 hover:shadow-indigo-500/50 hover:scale-105 active:scale-95 transition-all disabled:opacity-50 disabled:scale-100">
-                    {sendingMedia ? <div className="w-4 h-4 sm:w-5 sm:h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></div> : <Send className="w-4 h-4 sm:w-5 sm:h-5" />}
+                <button type="submit" disabled={!canSend} aria-label={sendingMedia ? 'Enviando adjunto' : 'Enviar'} title="Enviar" className="w-11 h-11 sm:w-12 sm:h-12 flex items-center justify-center shrink-0 rounded-xl sm:rounded-2xl bg-accent-600 text-white shadow-lg shadow-accent-500/30 hover:shadow-accent-500/50 hover:scale-105 active:scale-95 motion-reduce:transform-none transition-all disabled:opacity-50 disabled:scale-100 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-800">
+                    {sendingMedia ? <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" aria-hidden="true"></div> : <Send className="w-5 h-5" aria-hidden="true" />}
                 </button>
             </form>
         </div>

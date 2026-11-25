@@ -38,7 +38,8 @@ export default function CommentForm({
                 value={draft}
                 onChange={(e) => setDraft(e.target.value)}
                 placeholder="Tu comentario, observación o pregunta…"
-                className="w-full h-24 p-3 text-sm rounded-control border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 resize-none"
+                aria-label="Comentario"
+                className="w-full h-24 p-3 text-base md:text-sm rounded-control border border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 resize-none"
                 autoFocus
             />
 
@@ -52,7 +53,8 @@ export default function CommentForm({
                         value={draftSuggested}
                         onChange={(e) => setDraftSuggested(e.target.value)}
                         placeholder="Si querés sugerir el texto reemplazado completo, copiálo acá."
-                        className="w-full h-28 p-3 text-sm rounded-control border border-warning-200 dark:border-warning-900/40 bg-warning-50/50 dark:bg-warning-900/10 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-warning-500 focus:ring-2 focus:ring-warning-500/20 resize-none font-mono"
+                        aria-label="Texto sugerido (opcional)"
+                        className="w-full h-28 p-3 text-base md:text-sm rounded-control border border-warning-200 dark:border-warning-900/40 bg-warning-50/50 dark:bg-warning-900/10 text-slate-800 dark:text-slate-100 focus:outline-none focus:border-warning-500 focus:ring-2 focus:ring-warning-500/20 resize-none font-mono"
                     />
                 </div>
             )}

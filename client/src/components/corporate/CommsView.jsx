@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useMemo } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
 import { Search, MessageCircle } from 'lucide-react';
 
 import api from '../../config/axios';
@@ -13,7 +13,7 @@ import AiCorrectionModal from './components/AiCorrectionModal';
 import ManualOrderEntryModal from './components/ManualOrderEntryModal';
 import ManualMpLinkModal from './components/ManualMpLinkModal';
 
-import ChatSidebarItem from './comms/ChatSidebarItem';
+import ChatList from './comms/ChatList';
 import AlertBanner from './comms/AlertBanner';
 import OrdersDrawer from './comms/OrdersDrawer';
 import ScriptPanel from './comms/ScriptPanel';
@@ -26,7 +26,7 @@ import { formatScriptMessage, extractConfirmationContext, buildConfirmMessage } 
 import { downloadChatHistory } from './comms/chatHistoryText';
 
 const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], onAlertAction }) => {
-    const { toast } = useToast();
+    const { toast, confirm } = useToast();
     const { selectedSellerId } = useSeller();
 
     // UI state
@@ -86,16 +86,27 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], o
     const { searchTerm, setSearchTerm, searchResults, isSearching, filteredChats } = useChatSearch(chats);
     const { scriptFlow, prices } = useScriptFlow();
 
+    // Chat abierto "ahora", para lo que se resuelve después de un await.
+    const selectedChatIdRef = useRef(selectedChatId);
+    useEffect(() => { selectedChatIdRef.current = selectedChatId; }, [selectedChatId]);
+
     // Reset selected chat cuando un admin cambia de seller.
     useEffect(() => { setSelectedChatId(null); setSelectedChatFallback(null); }, [selectedSellerId]);
 
     // Wrapper que dispara `onChatOpened` (típicamente colapsa el sidebar
     // principal) sólo cuando un chat se selecciona — no al limpiar (null).
-    const selectChat = (chat) => {
+    // Estable (useCallback + ref al callback del padre, que llega nuevo en cada
+    // render): es prop de cada fila memoizada de la lista.
+    const onChatOpenedRef = useRef(onChatOpened);
+    useEffect(() => { onChatOpenedRef.current = onChatOpened; }, [onChatOpened]);
+    const selectChat = useCallback((chat) => {
         setSelectedChatId(chat?.id || null);
         setSelectedChatFallback(chat || null);
-        if (chat && onChatOpened) onChatOpened();
-    };
+        if (chat && onChatOpenedRef.current) onChatOpenedRef.current();
+    }, []);
+
+    // Teléfonos con alerta activa: un Set en vez de recorrer `alerts` por cada fila.
+    const alertPhones = useMemo(() => new Set(alerts.map(a => a.userPhone)), [alerts]);
 
     useEffect(() => {
         localStorage.setItem('herbalis_chat_font_size', chatFontSize);
@@ -207,10 +218,13 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], o
 
     const handleDeleteMessage = async (msgId) => {
         if (!selectedChat || !msgId) return;
-        if (!window.confirm('¿Eliminar este mensaje para todos?')) return;
+        // El chat se fija ANTES de esperar la confirmación: mientras el aviso está
+        // abierto se puede cambiar de conversación.
+        const chatId = selectedChat.id;
+        if (!(await confirm('¿Eliminar este mensaje para todos?'))) return;
         try {
             setMessages(prev => prev.filter(m => m.id !== msgId));
-            await deleteMessage({ chatId: selectedChat.id, messageId: msgId });
+            await deleteMessage({ chatId, messageId: msgId });
             toast.success('Mensaje eliminado');
         } catch { toast.error('Error eliminando mensaje'); }
     };
@@ -255,10 +269,13 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], o
     };
 
     const handleClearChat = async () => {
-        if (!window.confirm('¿Reiniciar historial de este usuario?')) return;
+        if (!selectedChat) return;
+        const chatId = selectedChat.id;
+        if (!(await confirm('¿Reiniciar historial de este usuario?'))) return;
         try {
-            await clearChat(selectedChat.id);
-            setMessages([]);
+            await clearChat(chatId);
+            // Solo se vacía la conversación a la vista si sigue siendo la reiniciada.
+            if (selectedChatIdRef.current === chatId) setMessages([]);
             toast.success('Chat reiniciado');
         } catch (e) {
             console.error('Error al reiniciar chat:', e);
@@ -354,7 +371,7 @@ Teléfono: ${phoneDisplay}`;
     // ─── Render ────────────────────────────────────────────────────────────
 
     return (
-        <div className="flex-1 w-full min-h-0 flex flex-col md:flex-row animate-fade-in relative overflow-hidden bg-white dark:bg-slate-900 rounded-card border border-slate-200 dark:border-slate-700/70 shadow-card">
+        <div className="flex-1 w-full min-h-0 flex flex-col md:flex-row animate-fade-in motion-reduce:animate-none relative overflow-hidden bg-white dark:bg-slate-900 rounded-card border border-slate-200 dark:border-slate-700/70 shadow-card">
 
             {/* SIDEBAR: contactos */}
             <aside className={cn(
@@ -374,36 +391,39 @@ Teléfono: ${phoneDisplay}`;
                     />
                 </div>
 
-                {/* Lista */}
-                <div className="flex-1 overflow-y-auto custom-scrollbar p-2">
+                {/* Avisos de la búsqueda (fuera del scroll: la lista de abajo es virtualizada) */}
+                <div role="status" className="flex-shrink-0">
                     {isSearching && (
-                        <p className="px-3 py-2 text-xs text-slate-500 dark:text-slate-400 italic">
+                        <p className="px-5 pt-3 pb-1 text-xs text-slate-500 dark:text-slate-400 italic">
                             Buscando en historial…
                         </p>
                     )}
                     {searchTerm.trim().length >= 2 && !isSearching && filteredChats.length === 0 && (
-                        <p className="px-3 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
+                        <p className="px-5 py-6 text-center text-xs text-slate-500 dark:text-slate-400">
                             Sin resultados para "<span className="font-semibold text-slate-700 dark:text-slate-200">{searchTerm}</span>"
                         </p>
                     )}
-                    {isLoadingChats && chats.length === 0 ? (
-                        Array.from({ length: 6 }).map((_, i) => (
+                </div>
+
+                {/* Lista */}
+                {isLoadingChats && chats.length === 0 ? (
+                    <div className="flex-1 min-h-0 overflow-y-auto custom-scrollbar p-2">
+                        {Array.from({ length: 6 }).map((_, i) => (
                             <div key={i} className="p-3 mb-1 rounded-control animate-pulse bg-slate-100 dark:bg-slate-800/50 h-16 space-y-2">
                                 <div className="h-3 bg-slate-200 dark:bg-slate-700 rounded w-1/2" />
                                 <div className="h-2 bg-slate-200 dark:bg-slate-700 rounded w-3/4" />
                             </div>
-                        ))
-                    ) : filteredChats.map(chat => (
-                        <ChatSidebarItem
-                            key={chat.id}
-                            chat={chat}
-                            isSelected={selectedChat?.id === chat.id}
-                            hasAlert={alerts.some(a => a.userPhone === chat.id || a.userPhone === chat.id.split('@')[0])}
-                            searchTerm={searchTerm}
-                            onSelect={selectChat}
-                        />
-                    ))}
-                </div>
+                        ))}
+                    </div>
+                ) : (
+                    <ChatList
+                        chats={filteredChats}
+                        selectedChatId={selectedChatId}
+                        alertPhones={alertPhones}
+                        searchTerm={searchTerm}
+                        onSelect={selectChat}
+                    />
+                )}
             </aside>
 
             {/* MAIN CHAT */}

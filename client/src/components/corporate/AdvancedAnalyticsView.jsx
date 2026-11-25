@@ -129,6 +129,9 @@ const AdvancedAnalyticsView = () => {
 
     const cartesianGridColor = isDark ? '#334155' : '#e2e8f0';
     const axisTextColor = isDark ? '#94a3b8' : '#64748b';
+    // Rosa de la tasa de cierre (línea, eje y leyenda). El #ec4899 de antes daba
+    // 3,5:1 sobre blanco en el texto de la leyenda; pink-700 da ~6:1.
+    const rateColor = isDark ? '#f472b6' : '#be185d';
 
     const totalChats = data.demographics?.dailyChats?.reduce((acc, d) => acc + d.chats, 0) || 0;
     const totalOrders = data.overview?.orders?.value || 0;
@@ -142,7 +145,7 @@ const AdvancedAnalyticsView = () => {
                 viajaban en flex-row con justify-between, lo que colapsaba el
                 título a 2 líneas cuando había muchos vendedores. */}
             <header>
-                <h1 className="text-display text-slate-900 dark:text-slate-100">Business Intelligence</h1>
+                <h1 className="text-display text-slate-900 dark:text-slate-100">Estadísticas</h1>
                 <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                     Análisis de rendimiento, conversión y ventas del bot.
                 </p>
@@ -284,12 +287,12 @@ const AdvancedAnalyticsView = () => {
                                         dy={10}
                                     />
                                     <YAxis yAxisId="left" stroke={axisTextColor} fontSize={11} tickLine={false} axisLine={false} dx={-10} />
-                                    <YAxis yAxisId="right" orientation="right" stroke="#ec4899" fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} dx={10} />
+                                    <YAxis yAxisId="right" orientation="right" stroke={rateColor} fontSize={11} tickLine={false} axisLine={false} tickFormatter={(v) => `${v}%`} dx={10} />
                                     <RechartsTooltip content={<CustomTooltip />} cursor={{ fill: isDark ? '#334155' : '#f1f5f9' }} />
                                     <Legend verticalAlign="top" height={36} iconType="circle" wrapperStyle={{ fontSize: '12px', color: axisTextColor, fontWeight: '500' }} />
                                     <Bar yAxisId="left" dataKey="chats"  name="Nuevos chats" fill="url(#colorChats)"  radius={[4, 4, 0, 0]} barSize={12} />
                                     <Bar yAxisId="left" dataKey="orders" name="Pedidos"      fill="url(#colorOrders)" radius={[4, 4, 0, 0]} barSize={12} />
-                                    <Line yAxisId="right" type="monotone" dataKey="rate" name="Tasa de cierre (%)" stroke="#ec4899" strokeWidth={2.5} dot={{ r: 3, fill: '#ec4899', strokeWidth: 2, stroke: isDark ? '#1e293b' : '#ffffff' }} activeDot={{ r: 6 }} />
+                                    <Line yAxisId="right" type="monotone" dataKey="rate" name="Tasa de cierre (%)" stroke={rateColor} strokeWidth={2.5} dot={{ r: 3, fill: rateColor, strokeWidth: 2, stroke: isDark ? '#1e293b' : '#ffffff' }} activeDot={{ r: 6 }} />
                                 </ComposedChart>
                             </ResponsiveContainer>
                         </div>
@@ -322,7 +325,7 @@ const AdvancedAnalyticsView = () => {
                                 return (
                                     <div key={i} className="flex items-center justify-between py-2.5 border-b border-dashed border-slate-200 dark:border-slate-700 last:border-0 relative">
                                         <div
-                                            className="absolute inset-y-1 left-0 z-0 pointer-events-none opacity-10 rounded-md transition-all duration-700"
+                                            className="absolute inset-y-1 left-0 z-0 pointer-events-none opacity-10 rounded-md transition-[width] duration-700 motion-reduce:transition-none"
                                             style={{ width: `${percentage}%`, backgroundColor: COLORS[i % COLORS.length] }}
                                         />
                                         <div className="flex-1 flex items-center gap-2 text-sm font-medium text-slate-900 dark:text-slate-200 relative z-10 min-w-0 pr-2">
@@ -409,7 +412,7 @@ const AdvancedAnalyticsView = () => {
                                     <span className="text-xl font-semibold tabular-nums text-slate-900 dark:text-slate-100">
                                         {data.products?.popularity?.reduce((a, b) => a + b.value, 0) || 0}
                                     </span>
-                                    <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400 mt-0.5">Items</span>
+                                    <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400 mt-0.5">Items</span>
                                 </div>
                             </div>
                         </Card>
@@ -447,7 +450,7 @@ const AdvancedAnalyticsView = () => {
                                 </ResponsiveContainer>
                                 <div className="absolute inset-0 flex flex-col items-center justify-center pointer-events-none mt-[-30px]">
                                     <span className="text-base font-semibold text-slate-900 dark:text-slate-100">Planes</span>
-                                    <span className="text-[10px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400 mt-0.5">Duración</span>
+                                    <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400 mt-0.5">Duración</span>
                                 </div>
                             </div>
                         </Card>

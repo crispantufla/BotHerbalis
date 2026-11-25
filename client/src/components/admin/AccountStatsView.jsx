@@ -237,7 +237,7 @@ function DailySection({ daily }) {
                                     })}
                                 </div>
                             </div>
-                            <span className="text-[10px] text-slate-400 dark:text-slate-500 tabular-nums">{formatDate(day)}</span>
+                            <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">{formatDate(day)}</span>
                         </div>
                     );
                 })}
@@ -248,7 +248,7 @@ function DailySection({ daily }) {
                     <div key={a.id} className="flex items-center gap-1.5">
                         <span className="w-3 h-3 rounded" style={{ backgroundColor: colorFor(i) }} />
                         <span className="capitalize">{a.name}</span>
-                        <span className="text-slate-400 dark:text-slate-500 tabular-nums">({formatDur(a.total)})</span>
+                        <span className="text-slate-500 dark:text-slate-400 tabular-nums">({formatDur(a.total)})</span>
                     </div>
                 ))}
             </div>
@@ -326,7 +326,7 @@ function HeatmapSection({ heatmap, selectedSeller, onSelectSeller }) {
                 <div className="inline-block">
                     <div className="flex gap-[2px] mb-1 pl-10">
                         {Array.from({ length: 24 }, (_, h) => (
-                            <div key={h} className="w-[22px] text-[9px] text-center text-slate-400 dark:text-slate-500 tabular-nums">
+                            <div key={h} className="w-[22px] text-[11px] text-center text-slate-500 dark:text-slate-400 tabular-nums">
                                 {h % 3 === 0 ? h : ''}
                             </div>
                         ))}

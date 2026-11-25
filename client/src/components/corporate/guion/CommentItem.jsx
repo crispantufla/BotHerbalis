@@ -18,7 +18,7 @@ export default function CommentItem({ comment, isNew, actions }) {
 
     return (
         <div className={cn(
-            'p-3 rounded-control border transition-all',
+            'p-3 rounded-control border transition-[background-color,border-color,opacity]',
             comment.resolved
                 ? 'bg-slate-50 dark:bg-slate-800/30 border-slate-200/70 dark:border-slate-700/70 opacity-70'
                 : isNew
@@ -48,7 +48,7 @@ export default function CommentItem({ comment, isNew, actions }) {
                                 Resuelto
                             </Badge>
                         )}
-                        <span className="text-[10px] text-slate-400 dark:text-slate-500 tabular-nums">
+                        <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
                             {formatDate(comment.createdAt)}
                         </span>
                     </div>
@@ -100,7 +100,7 @@ export default function CommentItem({ comment, isNew, actions }) {
                         </button>
                         {thumbsReactions.length > 0 && (
                             <span
-                                className="text-[10px] text-slate-400 dark:text-slate-500 italic"
+                                className="text-[11px] text-slate-500 dark:text-slate-400 italic"
                                 title={thumbsReactions.map(r => r.name).join(', ')}
                             >
                                 {thumbsReactions.slice(0, 2).map(r => r.name).join(', ')}

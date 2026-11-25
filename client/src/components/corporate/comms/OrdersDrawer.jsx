@@ -14,7 +14,7 @@ export default function OrdersDrawer({
     trackingData,
 }) {
     return (
-        <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 sm:p-5 z-10 animate-fade-in flex-shrink-0">
+        <div className="border-b border-slate-200 dark:border-slate-700 bg-white dark:bg-slate-800 p-4 sm:p-5 z-10 animate-fade-in motion-reduce:animate-none flex-shrink-0">
             <div className="flex justify-between items-center mb-4">
                 <div className="flex items-center gap-2">
                     <div className="w-8 h-8 rounded-control bg-accent-50 dark:bg-accent-900/30 text-accent-600 dark:text-accent-400 flex items-center justify-center">

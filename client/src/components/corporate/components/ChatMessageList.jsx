@@ -1,4 +1,4 @@
-import React, { useRef, useEffect } from 'react';
+import React, { useRef, useEffect, useState } from 'react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { Trash2 as Trash, Play, AlertTriangle } from 'lucide-react';
 import { API_URL } from '../../../config/api';
@@ -28,6 +28,11 @@ const formatDateSeparator = (date) => {
 
 const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessage, handleReportMessage }) => {
     const parentRef = useRef(null);
+    // La píldora flotante de fecha solo se ve mientras se recorre el historial
+    // (como en WhatsApp): fija, tapaba el primer mensaje a la vista.
+    const [showFloatingDate, setShowFloatingDate] = useState(false);
+    const hideDateTimerRef = useRef(null);
+    const autoScrollUntilRef = useRef(0);
 
     const rowVirtualizer = useVirtualizer({
         count: messages.length,
@@ -40,14 +45,35 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
     // Auto scroll to bottom when new messages arrive
     useEffect(() => {
         if (messages.length > 0) {
+            // El salto al final no cuenta como "recorrer el historial".
+            autoScrollUntilRef.current = Date.now() + 500;
             rowVirtualizer.scrollToIndex(messages.length - 1, { align: 'end' });
         }
     }, [messages.length, rowVirtualizer]);
 
+    useEffect(() => () => clearTimeout(hideDateTimerRef.current), []);
+
+    const handleScroll = () => {
+        if (Date.now() < autoScrollUntilRef.current) return;
+        setShowFloatingDate(true);
+        clearTimeout(hideDateTimerRef.current);
+        hideDateTimerRef.current = setTimeout(() => setShowFloatingDate(false), 1200);
+    };
+
     const renderMessageBody = (msg) => {
         if (msg.body && msg.body.startsWith('MEDIA_IMAGE:')) {
             const url = msg.body.split('|')[0].replace('MEDIA_IMAGE:', '');
-            return <img src={`${API_URL}${url}`} alt="Media" className="rounded-2xl max-w-full h-auto max-h-64 object-cover border border-white/2 dark:border-slate-700/20 shadow-sm" />;
+            // Caja de tamaño fijo: la fila virtualizada no cambia de alto cuando la
+            // imagen termina de cargar. `object-contain`: se ve entera (comprobantes).
+            return (
+                <img
+                    src={`${API_URL}${url}`}
+                    alt="Imagen adjunta"
+                    loading="lazy"
+                    decoding="async"
+                    className="block w-64 max-w-full h-64 object-contain rounded-2xl bg-black/5 dark:bg-white/5 border border-white/2 dark:border-slate-700/20 shadow-sm"
+                />
+            );
         }
         if (msg.body && (msg.body.startsWith('MEDIA_AUDIO:') || msg.body.startsWith('🎤'))) {
             let audioUrl = '';
@@ -70,7 +96,7 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
                             <audio
                                 controls
                                 preload="metadata"
-                                className="w-full h-10 drop-shadow-sm [&::-webkit-media-controls-panel]:bg-emerald-50 [&::-webkit-media-controls-play-button]:bg-emerald-500 [&::-webkit-media-controls-play-button]:rounded-full [&::-webkit-media-controls-current-time-display]:text-emerald-700 [&::-webkit-media-controls-time-remaining-display]:text-emerald-700 pl-1"
+                                className="w-full h-10 drop-shadow-sm [&::-webkit-media-controls-panel]:bg-success-50 [&::-webkit-media-controls-play-button]:bg-success-500 [&::-webkit-media-controls-play-button]:rounded-full [&::-webkit-media-controls-current-time-display]:text-success-700 [&::-webkit-media-controls-time-remaining-display]:text-success-700 pl-1"
                                 src={`${API_URL}${audioUrl}`}
                             >
                                 Tu navegador no soporta el elemento de audio.
@@ -84,7 +110,7 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
                     )}
                     {transcription && transcription !== 'PENDING' && (
                         <div className="bg-slate-50 dark:bg-slate-800/40 p-3 rounded-xl text-xs flex items-start gap-2 text-slate-700 dark:text-slate-300 font-medium border border-slate-200 dark:border-slate-700/50">
-                            <span className="text-emerald-600 mt-0.5">📝</span>
+                            <span className="text-success-600 mt-0.5" aria-hidden="true">📝</span>
                             <span className="italic leading-relaxed flex-1">"{transcription}"</span>
                         </div>
                     )}
@@ -99,7 +125,7 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
             <div className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 pt-8 pb-2 space-y-6 custom-scrollbar relative z-10 w-full h-full flex flex-col justify-end">
                 {Array.from({ length: 4 }).map((_, i) => (
                     <div key={i} className={`flex ${i % 2 === 0 ? 'justify-start' : 'justify-end'}`}>
-                        <div className="w-64 h-16 bg-slate-200 dark:bg-slate-700/50 rounded-3xl animate-pulse"></div>
+                        <div className="w-64 max-w-[75%] h-16 bg-slate-200 dark:bg-slate-700/50 rounded-3xl animate-pulse"></div>
                     </div>
                 ))}
             </div>
@@ -126,15 +152,18 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
     }
 
     return (
-        <div ref={parentRef} className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 pt-4 pb-2 custom-scrollbar relative z-10 w-full">
+        <div className="flex-1 min-h-0 relative z-10 w-full flex flex-col">
             {floatingDateText && (
-                <div className="sticky top-2 z-50 flex justify-center mb-[-28px] pointer-events-none">
-                    <div className="bg-slate-200/95 dark:bg-slate-700/95 backdrop-blur-md px-4 py-1.5 rounded-full text-[11px] font-medium text-slate-600 dark:text-slate-300 shadow-sm border border-slate-300/50 dark:border-slate-600/50">
+                <div
+                    aria-hidden="true"
+                    className={`absolute top-2 inset-x-0 z-20 flex justify-center pointer-events-none transition-opacity duration-200 motion-reduce:transition-none ${showFloatingDate ? 'opacity-100' : 'opacity-0'}`}
+                >
+                    <div className="bg-slate-200 dark:bg-slate-700 px-4 py-1.5 rounded-full text-[11px] font-medium text-slate-700 dark:text-slate-200 shadow-sm border border-slate-300 dark:border-slate-600">
                         {floatingDateText}
                     </div>
                 </div>
             )}
-
+            <div ref={parentRef} onScroll={handleScroll} className="flex-1 min-h-0 overflow-y-auto px-4 sm:px-8 pt-4 pb-2 custom-scrollbar w-full">
             <div
                 style={{
                     height: `${rowVirtualizer.getTotalSize()}px`,
@@ -182,26 +211,30 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
                             )}
 
                             <div className={`flex ${msg.fromMe ? 'justify-end' : 'justify-start'}`}>
-                                <div className={`max-w-[75%] p-4 leading-relaxed shadow-sm relative group ${msg.fromMe ? 'bg-gradient-to-br from-indigo-600 to-purple-600 text-white rounded-3xl rounded-tr-sm shadow-indigo-500/20' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-3xl rounded-tl-sm border border-slate-100 dark:border-slate-700'}`} style={{ fontSize: `${chatFontSize}px` }}>
+                                <div className={`max-w-[75%] p-4 leading-relaxed shadow-sm relative group ${msg.fromMe ? 'bg-accent-600 text-white rounded-3xl rounded-tr-sm shadow-accent-500/20' : 'bg-white dark:bg-slate-800 text-slate-800 dark:text-slate-200 rounded-3xl rounded-tl-sm border border-slate-100 dark:border-slate-700'}`} style={{ fontSize: `${chatFontSize}px` }}>
                                     {renderMessageBody(msg)}
-                                    <span className={`text-[10px] block text-right mt-2 font-mono font-bold ${msg.fromMe ? 'text-indigo-200' : 'text-slate-400'}`}>
+                                    <span className={`text-[11px] block text-right mt-2 font-mono font-bold ${msg.fromMe ? 'text-white/85' : 'text-slate-500 dark:text-slate-400'}`}>
                                         {new Date(msg.timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' })}
                                     </span>
                                     {msg.fromMe && (
-                                        <div className="absolute -left-16 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-40 group-hover:opacity-100 transition-opacity">
+                                        <div className="absolute -left-[5.5rem] md:-left-16 top-1/2 -translate-y-1/2 flex items-center gap-1 opacity-70 md:opacity-40 md:group-hover:opacity-100 focus-within:opacity-100 transition-opacity">
                                             <button
+                                                type="button"
+                                                aria-label="Reportar mensaje incorrecto a la IA"
                                                 onClick={(e) => { e.stopPropagation(); if (typeof handleReportMessage === 'function') handleReportMessage(msg.id); }}
-                                                className="p-1.5 text-amber-500 hover:text-white hover:bg-amber-500 rounded-full transition-all shadow-sm"
+                                                className="w-10 h-10 md:w-7 md:h-7 flex items-center justify-center text-warning-500 hover:text-white hover:bg-warning-500 rounded-full transition-colors md:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-warning-500"
                                                 title="Reportar mensaje incorrecto a la IA"
                                             >
-                                                <AlertTriangle className="w-4 h-4" />
+                                                <AlertTriangle className="w-4 h-4" aria-hidden="true" />
                                             </button>
                                             <button
+                                                type="button"
+                                                aria-label="Eliminar mensaje para todos"
                                                 onClick={(e) => { e.stopPropagation(); handleDeleteMessage(msg.id); }}
-                                                className="p-1.5 text-slate-400 hover:text-rose-500 hover:bg-rose-50 rounded-full transition-all shadow-sm"
+                                                className="w-10 h-10 md:w-7 md:h-7 flex items-center justify-center text-slate-500 dark:text-slate-400 hover:text-danger-600 dark:hover:text-danger-500 hover:bg-danger-50 dark:hover:bg-danger-900/30 rounded-full transition-colors md:shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-danger-500"
                                                 title="Eliminar mensaje para todos"
                                             >
-                                                <Trash className="w-4 h-4" />
+                                                <Trash className="w-4 h-4" aria-hidden="true" />
                                             </button>
                                         </div>
                                     )}
@@ -210,6 +243,7 @@ const ChatMessageList = ({ messages, isLoading, chatFontSize, handleDeleteMessag
                         </div>
                     );
                 })}
+            </div>
             </div>
         </div>
     );

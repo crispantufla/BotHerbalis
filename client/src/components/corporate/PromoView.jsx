@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useId } from 'react';
 import { Gift, RefreshCw, Play, Pause, Square, Send, Users, MessageCircle, Eye, ChevronDown, ChevronUp, Plus, Pencil } from 'lucide-react';
 import api from '../../config/axios';
 import PromoResponses from './PromoResponses';
@@ -78,7 +78,8 @@ function NumField({ label, value, onChange, min, max, hint, disabled = false }) 
 }
 
 const PromoView = ({ onGoToChat }) => {
-    const { toast } = useToast();
+    const { toast, confirm } = useToast();
+    const baseMessageId = useId();
     const [campaigns, setCampaigns] = useState([]);
     const [loading, setLoading] = useState(false);
     const [selectedId, setSelectedId] = useState(null);
@@ -129,8 +130,15 @@ const PromoView = ({ onGoToChat }) => {
     // Mientras hay una campaña corriendo, refrescar cada minuto.
     useEffect(() => {
         if (!campaigns.some(c => c.status === 'running')) return undefined;
-        const t = setInterval(() => { fetchCampaigns(); if (selectedId) fetchDetail(selectedId, recipientFilter); }, 60000);
-        return () => clearInterval(t);
+        // Con la pestaña oculta no se pide nada; al volver, se pone al día.
+        const refresh = () => {
+            if (document.visibilityState !== 'visible') return;
+            fetchCampaigns();
+            if (selectedId) fetchDetail(selectedId, recipientFilter);
+        };
+        const t = setInterval(refresh, 60000);
+        document.addEventListener('visibilitychange', refresh);
+        return () => { clearInterval(t); document.removeEventListener('visibilitychange', refresh); };
     }, [campaigns, fetchCampaigns, fetchDetail, selectedId, recipientFilter]);
 
     const setF = (k) => (v) => setForm(prev => ({ ...prev, [k]: v }));
@@ -259,11 +267,11 @@ const PromoView = ({ onGoToChat }) => {
         <div className="p-4 md:p-6 w-full max-w-7xl mx-auto space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-3">
-                    <div className="w-10 h-10 rounded-control bg-pink-50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 flex items-center justify-center">
-                        <Gift className="w-5 h-5" />
+                    <div className="w-10 h-10 flex-shrink-0 rounded-control bg-pink-50 dark:bg-pink-900/30 text-pink-600 dark:text-pink-400 flex items-center justify-center">
+                        <Gift className="w-5 h-5" aria-hidden="true" />
                     </div>
                     <div>
-                        <h2 className="text-lg font-bold text-slate-900 dark:text-slate-100">Promos</h2>
+                        <h1 className="text-lg font-bold text-slate-900 dark:text-slate-100">Promos</h1>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
                             Le escribe la oferta de Club Herbys a todas las personas que hablaron con el número, de a uno y con pausas al azar.
                             Cuando responden, la IA contesta dudas y avisa al número de avisos cuando alguien acepta o pide una asesora.
@@ -297,7 +305,7 @@ const PromoView = ({ onGoToChat }) => {
                         <NumField label="Pausa máxima (min)" value={form.maxGapMinutes} onChange={setF('maxGapMinutes')} min={1} max={1440} />
                         <NumField label="Corte largo cada N envíos" value={form.longBreakEvery} onChange={setF('longBreakEvery')} min={0} max={1000} hint="0 = nunca. Un corte dura entre 35 y 90 min." />
                         <NumField label="Saltear si escribió hace menos de (hs)" value={form.skipIfInboundHours} onChange={setF('skipIfInboundHours')} min={0} max={720} />
-                        <label className="flex items-center gap-2 text-sm text-slate-700 dark:text-slate-300 mt-6">
+                        <label className="flex items-center gap-2 min-h-[40px] text-sm text-slate-700 dark:text-slate-300 md:mt-6">
                             <input type="checkbox" checked={form.skipWeekends} onChange={(e) => setF('skipWeekends')(e.target.checked)} />
                             No mandar los fines de semana
                         </label>
@@ -305,11 +313,12 @@ const PromoView = ({ onGoToChat }) => {
 
                     <div className="mt-5">
                         <div className="flex flex-wrap items-center gap-3 mb-2">
-                            <label className="text-xs font-semibold text-slate-600 dark:text-slate-300">Mensaje de la promo</label>
+                            <label htmlFor={baseMessageId} className="text-xs font-semibold text-slate-600 dark:text-slate-300">Mensaje de la promo</label>
                         </div>
                         <textarea
+                            id={baseMessageId}
                             rows={9}
-                            className="w-full text-sm rounded-control border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-2"
+                            className="w-full text-base md:text-sm rounded-control border border-slate-300 dark:border-slate-600 bg-white dark:bg-slate-900 text-slate-800 dark:text-slate-200 p-2"
                             value={baseMessage}
                             onChange={(e) => setBaseMessage(e.target.value)}
                         />
@@ -367,14 +376,29 @@ const PromoView = ({ onGoToChat }) => {
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-4">
                     <div className="space-y-3">
                         {campaigns.map(c => (
-                            <Card key={c.id} padding="md" interactive className={cn(selectedId === c.id && 'ring-2 ring-accent-500')} onClick={() => setSelectedId(c.id)}>
+                            <Card
+                                key={c.id}
+                                padding="md"
+                                interactive
+                                // No puede ser un <button>: adentro lleva los botones de acción.
+                                role="button"
+                                tabIndex={0}
+                                aria-pressed={selectedId === c.id}
+                                aria-label={`Ver la campaña ${c.name}`}
+                                className={cn('cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500', selectedId === c.id && 'ring-2 ring-accent-500')}
+                                onClick={() => setSelectedId(c.id)}
+                                onKeyDown={(e) => {
+                                    if (e.target !== e.currentTarget) return;
+                                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedId(c.id); }
+                                }}
+                            >
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
-                                        <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">{c.name}</h3>
+                                        <h2 className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">{c.name}</h2>
                                         <p className="text-xs text-slate-500 dark:text-slate-400">
                                             {c.stats.sent}/{c.stats.total} enviados · {c.stats.replied} respondieron · {c.stats.converted} compraron
                                         </p>
-                                        {c.status === 'running' && <p className="text-[11px] text-slate-400 mt-1">Hoy {c.sentToday}/{c.config.dailyCap} · próximo {fmtTime(c.nextSendAt)}</p>}
+                                        {c.status === 'running' && <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Hoy {c.sentToday}/{c.config.dailyCap} · próximo {fmtTime(c.nextSendAt)}</p>}
                                     </div>
                                     <Badge tone={STATUS[c.status]?.tone || 'neutral'} size="sm">{STATUS[c.status]?.label || c.status}</Badge>
                                 </div>
@@ -383,7 +407,7 @@ const PromoView = ({ onGoToChat }) => {
                                     {c.status === 'running' && <Button size="sm" variant="secondary" leftIcon={Pause} onClick={() => act(c.id, 'pause')} loading={busy}>Pausar</Button>}
                                     {!['finished', 'cancelled'].includes(c.status) && <Button size="sm" variant="ghost" leftIcon={Pencil} onClick={() => openEdit(c)} disabled={busy}>Editar</Button>}
                                     {c.status === 'running' && <Button size="sm" variant="ghost" leftIcon={Send} onClick={() => act(c.id, 'send-now')} loading={busy}>Mandar ahora</Button>}
-                                    {!['finished', 'cancelled'].includes(c.status) && <Button size="sm" variant="danger" leftIcon={Square} onClick={() => { if (window.confirm('¿Cancelar la campaña? Los que no recibieron la promo quedan sin recibirla.')) act(c.id, 'cancel'); }} loading={busy}>Cancelar</Button>}
+                                    {!['finished', 'cancelled'].includes(c.status) && <Button size="sm" variant="danger" leftIcon={Square} onClick={async () => { if (await confirm('¿Cancelar la campaña? Los que no recibieron la promo quedan sin recibirla.')) act(c.id, 'cancel'); }} loading={busy}>Cancelar</Button>}
                                 </div>
                             </Card>
                         ))}
@@ -403,11 +427,11 @@ const PromoView = ({ onGoToChat }) => {
 
                                 <Card padding="md">
                                     <div className="flex flex-wrap items-center justify-between gap-2 mb-3">
-                                        <h3 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Destinatarios</h3>
+                                        <h2 className="font-semibold text-sm text-slate-900 dark:text-slate-100">Destinatarios</h2>
                                         <div className="flex gap-1.5 flex-wrap">
                                             {[['', 'Todos'], ['sent', 'Enviados'], ['pending', 'Pendientes'], ['skipped', 'Salteados'], ['failed', 'Fallidos'], ['opted_out', 'No quieren']].map(([v, l]) => (
-                                                <button key={v} type="button" onClick={() => setRecipientFilter(v)}
-                                                    className={cn('text-xs px-2.5 py-1 rounded-full border', recipientFilter === v ? 'bg-accent-500 text-white border-accent-500' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300')}>
+                                                <button key={v} type="button" onClick={() => setRecipientFilter(v)} aria-pressed={recipientFilter === v}
+                                                    className={cn('inline-flex items-center text-xs px-3 md:px-2.5 py-1 min-h-[40px] md:min-h-0 rounded-full border focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500', recipientFilter === v ? 'bg-accent-600 text-white border-accent-600' : 'border-slate-300 dark:border-slate-600 text-slate-600 dark:text-slate-300')}>
                                                     {l}
                                                 </button>
                                             ))}
@@ -416,10 +440,32 @@ const PromoView = ({ onGoToChat }) => {
                                     {detail.recipients.length === 0 ? (
                                         <p className="text-sm text-slate-500 dark:text-slate-400">Nada por acá.</p>
                                     ) : (
-                                        <div className="overflow-x-auto">
+                                        <>
+                                        <ul className="md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                                            {detail.recipients.map(r => (
+                                                <li key={r.id} className="py-2.5 flex items-center justify-between gap-3">
+                                                    <div className="min-w-0">
+                                                        <p className="font-mono text-xs text-slate-800 dark:text-slate-200">{r.phone}</p>
+                                                        <div className="flex flex-wrap items-center gap-1.5 mt-1">
+                                                            <Badge tone={RECIPIENT_STATUS[r.status]?.tone || 'neutral'} size="sm">{RECIPIENT_STATUS[r.status]?.label || r.status}</Badge>
+                                                            {r.outcome && <Badge tone={OUTCOME[r.outcome]?.tone || 'neutral'} size="sm">{OUTCOME[r.outcome]?.label || r.outcome}</Badge>}
+                                                            {!r.outcome && r.repliedAt && <span className="text-xs text-slate-500 dark:text-slate-400">respondió</span>}
+                                                        </div>
+                                                        <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
+                                                            {r.sentAt ? `Enviado ${fmtTime(r.sentAt)}` : 'Sin enviar'}
+                                                            {r.skipReason ? ` · ${SKIP_REASONS[r.skipReason] || r.skipReason}` : ''}
+                                                        </p>
+                                                    </div>
+                                                    {r.status !== 'pending' && onGoToChat && (
+                                                        <Button size="md" variant="secondary" leftIcon={MessageCircle} className="flex-shrink-0" onClick={() => onGoToChat(`${r.phone}@c.us`)}>Chat</Button>
+                                                    )}
+                                                </li>
+                                            ))}
+                                        </ul>
+                                        <div className="overflow-x-auto hidden md:block">
                                             <table className="w-full text-sm">
                                                 <thead className="text-xs text-slate-500 dark:text-slate-400 text-left">
-                                                    <tr><th className="py-1 pr-3">Teléfono</th><th className="py-1 pr-3">Estado</th><th className="py-1 pr-3">Enviado</th><th className="py-1 pr-3">Respuesta</th><th className="py-1"></th></tr>
+                                                    <tr><th className="py-1 pr-3">Teléfono</th><th className="py-1 pr-3">Estado</th><th className="py-1 pr-3">Enviado</th><th className="py-1 pr-3">Respuesta</th><th className="py-1"><span className="sr-only">Acciones</span></th></tr>
                                                 </thead>
                                                 <tbody>
                                                     {detail.recipients.map(r => (
@@ -427,10 +473,10 @@ const PromoView = ({ onGoToChat }) => {
                                                             <td className="py-1.5 pr-3 font-mono text-xs">{r.phone}</td>
                                                             <td className="py-1.5 pr-3">
                                                                 <Badge tone={RECIPIENT_STATUS[r.status]?.tone || 'neutral'} size="sm">{RECIPIENT_STATUS[r.status]?.label || r.status}</Badge>
-                                                                {r.skipReason && <span className="ml-1 text-[11px] text-slate-400">{SKIP_REASONS[r.skipReason] || r.skipReason}</span>}
+                                                                {r.skipReason && <span className="ml-1 text-[11px] text-slate-500 dark:text-slate-400">{SKIP_REASONS[r.skipReason] || r.skipReason}</span>}
                                                             </td>
-                                                            <td className="py-1.5 pr-3 text-xs text-slate-500">{fmtTime(r.sentAt)}</td>
-                                                            <td className="py-1.5 pr-3">{r.outcome ? <Badge tone={OUTCOME[r.outcome]?.tone || 'neutral'} size="sm">{OUTCOME[r.outcome]?.label || r.outcome}</Badge> : <span className="text-xs text-slate-400">{r.repliedAt ? 'respondió' : '—'}</span>}</td>
+                                                            <td className="py-1.5 pr-3 text-xs text-slate-500 dark:text-slate-400">{fmtTime(r.sentAt)}</td>
+                                                            <td className="py-1.5 pr-3">{r.outcome ? <Badge tone={OUTCOME[r.outcome]?.tone || 'neutral'} size="sm">{OUTCOME[r.outcome]?.label || r.outcome}</Badge> : <span className="text-xs text-slate-500 dark:text-slate-400">{r.repliedAt ? 'respondió' : '—'}</span>}</td>
                                                             <td className="py-1.5 text-right">
                                                                 {r.status !== 'pending' && onGoToChat && (
                                                                     <Button size="sm" variant="ghost" leftIcon={MessageCircle} onClick={() => onGoToChat(`${r.phone}@c.us`)}>Chat</Button>
@@ -441,6 +487,7 @@ const PromoView = ({ onGoToChat }) => {
                                                 </tbody>
                                             </table>
                                         </div>
+                                        </>
                                     )}
                                 </Card>
                             </>

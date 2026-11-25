@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo } from 'react';
 import api from '../config/axios';
 import { useToast } from '../components/ui/Toast';
 
@@ -47,7 +47,7 @@ export const AuthProvider = ({ children }) => {
         setLoading(false);
     }, []);
 
-    const login = async (username, password) => {
+    const login = useCallback(async (username, password) => {
         try {
             const res = await api.post('/api/login', { username, password });
             if (res.data.token) {
@@ -66,22 +66,27 @@ export const AuthProvider = ({ children }) => {
             return false;
         }
         return false;
-    };
+    }, [toast]);
 
-    const logout = () => {
+    const logout = useCallback(() => {
         setUser(null);
         localStorage.removeItem('user');
         localStorage.removeItem('token');
         localStorage.removeItem('selectedSellerId');
-    };
+    }, []);
 
     // All admins share the same privileges regardless of sellerId. The only
     // functional difference is that admins with a sellerId run their own
     // WhatsApp client (and scan a QR); admins without one don't.
     const isAdmin = user?.role === 'admin';
 
+    const value = useMemo(
+        () => ({ user, login, logout, loading, isAdmin }),
+        [user, login, logout, loading, isAdmin]
+    );
+
     return (
-        <AuthContext.Provider value={{ user, login, logout, loading, isAdmin }}>
+        <AuthContext.Provider value={value}>
             {!loading && children}
         </AuthContext.Provider>
     );

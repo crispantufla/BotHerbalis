@@ -22,7 +22,7 @@ function toCsv(rows) {
 }
 
 export default function PromoResponses({ onGoToChat }) {
-    const toast = useToast();
+    const { toast } = useToast();
     const [rows, setRows] = useState([]);
     const [all, setAll] = useState(false);
     const [loading, setLoading] = useState(false);
@@ -57,16 +57,16 @@ export default function PromoResponses({ onGoToChat }) {
         <Card padding="md">
             <div className="flex flex-wrap items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
-                    <Users className="w-5 h-5 text-accent-600 dark:text-accent-400" />
+                    <Users className="w-5 h-5 text-accent-600 dark:text-accent-400" aria-hidden="true" />
                     <div>
-                        <h3 className="font-bold text-slate-900 dark:text-slate-100">{all ? 'Todos los que respondieron' : 'Interesados en la promo'}</h3>
+                        <h2 className="font-bold text-slate-900 dark:text-slate-100">{all ? 'Todos los que respondieron' : 'Interesados en la promo'}</h2>
                         <p className="text-xs text-slate-500 dark:text-slate-400">
                             {all ? `${rows.length} respondieron · ${nInterested} interesados` : `${rows.length} aceptaron o pidieron hablar con una asesora`}
                         </p>
                     </div>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <label className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300">
+                    <label className="flex items-center gap-1.5 text-xs text-slate-600 dark:text-slate-300 min-h-[40px] md:min-h-0">
                         <input type="checkbox" checked={all} onChange={(e) => setAll(e.target.checked)} />
                         Ver todos los que respondieron
                     </label>
@@ -78,7 +78,35 @@ export default function PromoResponses({ onGoToChat }) {
             {rows.length === 0 ? (
                 <p className="mt-4 text-sm text-slate-500 dark:text-slate-400">{loading ? 'Cargando…' : 'Todavía no hay respuestas.'}</p>
             ) : (
-                <div className="mt-4 overflow-x-auto">
+                <>
+                {/* Móvil: tarjetas. La tabla de 5 columnas no entra en 390px
+                    (partía los nombres palabra por palabra). */}
+                <ul className="mt-4 md:hidden divide-y divide-slate-100 dark:divide-slate-800">
+                    {rows.map((r) => (
+                        <li key={r.phone + r.campaign} className="py-3 first:pt-0 last:pb-0">
+                            <div className="flex items-start justify-between gap-3">
+                                <div className="min-w-0">
+                                    <p className="font-medium text-slate-800 dark:text-slate-200 break-words">{r.name || 'Sin nombre'}</p>
+                                    <a href={`https://wa.me/${r.phone}`} target="_blank" rel="noreferrer" className="inline-flex items-center min-h-[32px] text-xs font-mono text-accent-600 dark:text-accent-400 hover:underline">{fmtPhone(r.phone)}</a>
+                                </div>
+                                <Badge tone={TONE[r.status] || 'neutral'} size="sm" className="flex-shrink-0">{r.statusLabel}</Badge>
+                            </div>
+                            <p className="text-xs text-slate-500 dark:text-slate-400">
+                                Respondió {fmt(r.repliedAt)}{r.campaign ? ` · ${r.campaign}` : ''}
+                            </p>
+                            {r.lastMessage && (
+                                <p className="mt-1.5 text-sm text-slate-600 dark:text-slate-300 break-words">
+                                    «{r.lastMessage}»
+                                    <span className="block text-xs text-slate-500 dark:text-slate-400">{fmt(r.lastMessageAt)}</span>
+                                </p>
+                            )}
+                            {onGoToChat && (
+                                <Button size="md" variant="secondary" leftIcon={MessageCircle} className="mt-2" onClick={() => onGoToChat(`${r.phone}@c.us`)}>Chat</Button>
+                            )}
+                        </li>
+                    ))}
+                </ul>
+                <div className="mt-4 overflow-x-auto hidden md:block">
                     <table className="w-full text-sm">
                         <thead>
                             <tr className="text-left text-xs text-slate-500 dark:text-slate-400">
@@ -86,7 +114,7 @@ export default function PromoResponses({ onGoToChat }) {
                                 <th className="pb-2 pr-3 font-medium">Estado</th>
                                 <th className="pb-2 pr-3 font-medium">Respondió</th>
                                 <th className="pb-2 pr-3 font-medium">Último mensaje</th>
-                                <th className="pb-2 font-medium" />
+                                <th className="pb-2 font-medium"><span className="sr-only">Acciones</span></th>
                             </tr>
                         </thead>
                         <tbody>
@@ -95,12 +123,12 @@ export default function PromoResponses({ onGoToChat }) {
                                     <td className="py-2 pr-3">
                                         <div className="font-medium text-slate-800 dark:text-slate-200">{r.name || 'Sin nombre'}</div>
                                         <a href={`https://wa.me/${r.phone}`} target="_blank" rel="noreferrer" className="text-xs font-mono text-accent-600 dark:text-accent-400 hover:underline">{fmtPhone(r.phone)}</a>
-                                        {r.campaign && <div className="text-[11px] text-slate-400">{r.campaign}</div>}
+                                        {r.campaign && <div className="text-[11px] text-slate-500 dark:text-slate-400">{r.campaign}</div>}
                                     </td>
                                     <td className="py-2 pr-3"><Badge tone={TONE[r.status] || 'neutral'} size="sm">{r.statusLabel}</Badge></td>
-                                    <td className="py-2 pr-3 text-xs text-slate-500 whitespace-nowrap">{fmt(r.repliedAt)}</td>
+                                    <td className="py-2 pr-3 text-xs text-slate-500 dark:text-slate-400 whitespace-nowrap">{fmt(r.repliedAt)}</td>
                                     <td className="py-2 pr-3 text-xs text-slate-600 dark:text-slate-300 max-w-xs">
-                                        {r.lastMessage ? <>«{r.lastMessage}»<div className="text-[11px] text-slate-400">{fmt(r.lastMessageAt)}</div></> : '—'}
+                                        {r.lastMessage ? <>«{r.lastMessage}»<div className="text-[11px] text-slate-500 dark:text-slate-400">{fmt(r.lastMessageAt)}</div></> : '—'}
                                     </td>
                                     <td className="py-2 text-right">
                                         {onGoToChat && <Button size="sm" variant="ghost" leftIcon={MessageCircle} onClick={() => onGoToChat(`${r.phone}@c.us`)}>Chat</Button>}
@@ -110,6 +138,7 @@ export default function PromoResponses({ onGoToChat }) {
                         </tbody>
                     </table>
                 </div>
+                </>
             )}
         </Card>
     );

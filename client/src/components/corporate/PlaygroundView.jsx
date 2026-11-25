@@ -152,7 +152,7 @@ const PlaygroundView = () => {
                         Reset
                     </Button>
 
-                    <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer">
+                    <label className="flex items-center gap-2 min-h-[40px] md:min-h-0 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer">
                         <input
                             type="checkbox"
                             checked={useDelay}
@@ -173,7 +173,8 @@ const PlaygroundView = () => {
                             <button
                                 type="button"
                                 onClick={() => setModel('gpt')}
-                                className={`px-2.5 h-7 rounded-control transition-colors ${model === 'gpt' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                aria-pressed={model === 'gpt'}
+                                className={`px-2.5 h-10 md:h-7 rounded-control transition-colors ${model === 'gpt' ? 'bg-white dark:bg-slate-700 text-slate-900 dark:text-slate-100 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
                                 title="Responder con GPT-4o"
                             >
                                 GPT-4o
@@ -181,7 +182,8 @@ const PlaygroundView = () => {
                             <button
                                 type="button"
                                 onClick={() => setModel('claude')}
-                                className={`px-2.5 h-7 rounded-control transition-colors ${model === 'claude' ? 'bg-white dark:bg-slate-700 text-accent-700 dark:text-accent-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                                aria-pressed={model === 'claude'}
+                                className={`px-2.5 h-10 md:h-7 rounded-control transition-colors ${model === 'claude' ? 'bg-white dark:bg-slate-700 text-accent-700 dark:text-accent-300 shadow-sm' : 'text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-300'}`}
                                 title="Responder con Claude (producción actual — Sonnet en pasos premium)"
                             >
                                 Claude
@@ -193,7 +195,8 @@ const PlaygroundView = () => {
                         <select
                             value={forceStep}
                             onChange={(e) => setForceStep(e.target.value)}
-                            className="text-xs px-2 h-8 rounded-control bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-accent-500"
+                            aria-label="Forzar step"
+                            className="text-base md:text-xs px-2 h-10 md:h-8 rounded-control bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-700 dark:text-slate-300 focus:outline-none focus:ring-2 focus:ring-accent-500"
                         >
                             <option value="">Forzar step...</option>
                             {FORCE_STEPS.map(s => <option key={s} value={s}>{s}</option>)}
@@ -210,7 +213,7 @@ const PlaygroundView = () => {
                     </div>
 
                     {sessionId && (
-                        <div className="text-[10px] text-slate-400 dark:text-slate-500 font-mono w-full md:w-auto">
+                        <div className="text-[11px] text-slate-500 dark:text-slate-400 font-mono w-full md:w-auto">
                             Session: {sessionId.slice(0, 8)}…
                         </div>
                     )}
@@ -223,7 +226,7 @@ const PlaygroundView = () => {
                 <Card padding="none" className="flex flex-col min-h-[60vh] max-h-[80vh]">
                     <div className="flex-1 overflow-y-auto p-4 space-y-3 bg-slate-50/50 dark:bg-slate-900/40">
                         {messages.length === 0 && (
-                            <div className="h-full flex items-center justify-center text-center text-sm text-slate-400 dark:text-slate-500 px-8">
+                            <div className="h-full flex items-center justify-center text-center text-sm text-slate-500 dark:text-slate-400 px-8">
                                 <div>
                                     <FlaskConical className="w-10 h-10 mx-auto mb-3 opacity-30" />
                                     <p>Escribí un mensaje para arrancar.</p>
@@ -239,7 +242,7 @@ const PlaygroundView = () => {
                             />
                         ))}
                         {sending && (
-                            <div className="flex items-center gap-2 text-xs text-slate-400 px-3">
+                            <div className="flex items-center gap-2 text-xs text-slate-500 dark:text-slate-400 px-3">
                                 <Loader2 className="w-3 h-3 animate-spin" />
                                 {useDelay ? 'El bot está pensando…' : 'Procesando…'}
                             </div>
@@ -257,16 +260,18 @@ const PlaygroundView = () => {
                                 placeholder="Escribí un mensaje… (Enter para enviar, Shift+Enter para nueva línea)"
                                 rows={2}
                                 disabled={sending || !sessionId}
-                                className="flex-1 resize-none px-3 py-2 text-sm rounded-control bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-50"
+                                aria-label="Mensaje para el bot"
+                                className="flex-1 resize-none px-3 py-2 text-base md:text-sm rounded-control bg-slate-50 dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 text-slate-800 dark:text-slate-200 focus:outline-none focus:ring-2 focus:ring-accent-500 disabled:opacity-50"
                             />
                             <Button
                                 onClick={handleSend}
                                 disabled={!input.trim() || sending || !sessionId}
+                                aria-label="Enviar mensaje"
                                 className="self-end"
                             >
                                 {sending
-                                    ? <Loader2 className="w-4 h-4 animate-spin" />
-                                    : <Send className="w-4 h-4" />}
+                                    ? <Loader2 className="w-4 h-4 animate-spin" aria-hidden="true" />
+                                    : <Send className="w-4 h-4" aria-hidden="true" />}
                             </Button>
                         </div>
                     </div>
@@ -301,7 +306,7 @@ function MessageBubble({ message, onReport }) {
     if (message.role === 'system') {
         return (
             <div className="flex justify-center">
-                <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
+                <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 bg-slate-100 dark:bg-slate-800 px-2 py-0.5 rounded">
                     {message.content}
                 </span>
             </div>
@@ -325,9 +330,10 @@ function MessageBubble({ message, onReport }) {
                     type="button"
                     onClick={onReport}
                     title="Reportar como error de IA"
-                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 rounded-md text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-amber-400 self-center"
+                    aria-label="Reportar como error de IA"
+                    className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity inline-flex items-center justify-center min-w-[40px] min-h-[40px] md:min-w-0 md:min-h-0 p-1 rounded-md text-amber-500 hover:text-amber-600 hover:bg-amber-50 dark:hover:bg-amber-900/20 focus:outline-none focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-amber-400 self-center"
                 >
-                    <AlertTriangle className="w-3.5 h-3.5" />
+                    <AlertTriangle className="w-4 h-4 md:w-3.5 md:h-3.5" aria-hidden="true" />
                 </button>
             )}
         </div>
@@ -340,7 +346,7 @@ function StatePanel({ state }) {
         return (
             <Card padding="md" className="h-fit">
                 <h3 className="text-sm font-semibold text-slate-800 dark:text-slate-200 mb-2">State del cliente</h3>
-                <p className="text-xs text-slate-400 dark:text-slate-500">Mandá un mensaje para inicializar el state.</p>
+                <p className="text-xs text-slate-500 dark:text-slate-400">Mandá un mensaje para inicializar el state.</p>
             </Card>
         );
     }
@@ -379,7 +385,7 @@ function StatePanel({ state }) {
 
             {hasAddr && (
                 <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Dirección parcial</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Dirección parcial</p>
                     <div className="space-y-1 text-xs">
                         {addr.nombre && <div><span className="text-slate-500">Nombre:</span> <span className="text-slate-800 dark:text-slate-200">{addr.nombre}</span></div>}
                         {addr.calle && <div><span className="text-slate-500">Calle:</span> <span className="text-slate-800 dark:text-slate-200">{addr.calle}</span></div>}
@@ -392,7 +398,7 @@ function StatePanel({ state }) {
 
             {state.cart && state.cart.length > 0 && (
                 <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Cart</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-slate-500 dark:text-slate-400 mb-1">Cart</p>
                     <div className="space-y-1 text-xs">
                         {state.cart.map((item, i) => (
                             <div key={i} className="flex justify-between gap-2">
@@ -406,7 +412,7 @@ function StatePanel({ state }) {
 
             {state.pauseReason && (
                 <div className="pt-2 border-t border-slate-200 dark:border-slate-700">
-                    <p className="text-[10px] font-semibold uppercase tracking-wide text-warning-600 dark:text-warning-400 mb-1">⏸️ Pausa</p>
+                    <p className="text-[11px] font-semibold uppercase tracking-wide text-warning-600 dark:text-warning-400 mb-1">⏸️ Pausa</p>
                     <p className="text-xs text-slate-700 dark:text-slate-300">{state.pauseReason}</p>
                 </div>
             )}

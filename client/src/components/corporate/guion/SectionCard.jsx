@@ -36,7 +36,7 @@ export default function SectionCard({
                 <div className="flex-1 min-w-0">
                     <p className="font-semibold text-sm text-slate-900 dark:text-slate-100">{label}</p>
                     {isFaq && keywords && (
-                        <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-0.5 font-mono">
+                        <p className="text-[11px] text-slate-500 dark:text-slate-400 mt-0.5 font-mono">
                             Triggers: {keywords.slice(0, 4).join(', ')}{keywords.length > 4 ? '…' : ''}
                         </p>
                     )}

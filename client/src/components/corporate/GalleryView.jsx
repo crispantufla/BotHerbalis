@@ -71,7 +71,7 @@ const GalleryView = () => {
     const categories = ['all', ...new Set(images.map(i => i.category || 'general'))];
 
     return (
-        <div className="h-full flex flex-col animate-fade-in relative z-10 w-full space-y-4">
+        <div className="h-full flex flex-col animate-fade-in motion-reduce:animate-none relative z-10 w-full space-y-4">
             <Card padding="md">
                 <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                     <div>
@@ -160,12 +160,12 @@ const GalleryView = () => {
                                     <img
                                         src={`${API_URL}${img.url}`}
                                         alt={img.originalName}
-                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105"
+                                        className="w-full h-full object-cover transition-transform duration-500 group-hover:scale-105 motion-reduce:transition-none motion-reduce:group-hover:scale-100"
                                         loading="lazy"
                                     />
 
                                     {/* Hover overlay */}
-                                    <div className="absolute inset-0 bg-slate-900/40 opacity-0 group-hover:opacity-100 transition-opacity duration-200 flex items-center justify-center gap-2">
+                                    <div className="absolute inset-0 md:bg-slate-900/40 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 transition-opacity duration-200 flex items-start justify-end p-1.5 md:p-0 md:items-center md:justify-center gap-2">
                                         <IconButton
                                             label="Ver completa"
                                             icon={Maximize}
@@ -195,7 +195,7 @@ const GalleryView = () => {
 
                                     <div className="flex items-center justify-between gap-2">
                                         <Badge tone="accent" size="sm">{img.category}</Badge>
-                                        <span className="text-[10px] font-mono text-slate-400 dark:text-slate-500 tabular-nums">
+                                        <span className="text-[11px] font-mono text-slate-500 dark:text-slate-400 tabular-nums">
                                             {new Date(img.createdAt).toLocaleDateString('es-AR', { day: '2-digit', month: '2-digit' })}
                                         </span>
                                     </div>
@@ -206,7 +206,7 @@ const GalleryView = () => {
                                                 <Badge key={t} tone="neutral" size="sm">#{t}</Badge>
                                             ))}
                                             {img.tags.length > 3 && (
-                                                <span className="text-[10px] text-slate-400 dark:text-slate-500 self-center">
+                                                <span className="text-[11px] text-slate-500 dark:text-slate-400 self-center">
                                                     +{img.tags.length - 3}
                                                 </span>
                                             )}

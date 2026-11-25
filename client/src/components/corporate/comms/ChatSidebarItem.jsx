@@ -41,7 +41,9 @@ function highlightSnippet(text, term) {
     };
 }
 
-export default function ChatSidebarItem({ chat, isSelected, hasAlert, searchTerm, onSelect }) {
+// Memoizado: con `chat` y `onSelect` estables, la fila no se vuelve a renderizar
+// cuando cambia otra cosa de CommsView (cada tecla en la caja de mensaje).
+function ChatSidebarItem({ chat, isSelected, hasAlert, searchTerm, onSelect }) {
     const handleClick = () => onSelect(chat);
 
     return (
@@ -49,7 +51,7 @@ export default function ChatSidebarItem({ chat, isSelected, hasAlert, searchTerm
             type="button"
             onClick={handleClick}
             className={cn(
-                'w-full text-left p-3 mb-1 rounded-control flex transition-colors duration-150',
+                'w-full text-left p-3 rounded-control flex transition-colors duration-150',
                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500',
                 isSelected
                     ? 'bg-accent-600 text-white'
@@ -68,13 +70,15 @@ export default function ChatSidebarItem({ chat, isSelected, hasAlert, searchTerm
                             </h3>
                             {hasAlert ? (
                                 <span
-                                    className="w-2 h-2 rounded-full bg-danger-500 animate-pulse"
+                                    role="img"
+                                    className="w-2 h-2 rounded-full flex-shrink-0 bg-danger-500 animate-pulse motion-reduce:animate-none"
                                     title="Atención requerida"
                                     aria-label="Atención requerida"
                                 />
                             ) : chat.isPaused && (
                                 <span
-                                    className="w-2 h-2 rounded-full bg-warning-500 animate-pulse"
+                                    role="img"
+                                    className="w-2 h-2 rounded-full flex-shrink-0 bg-warning-500 animate-pulse motion-reduce:animate-none"
                                     title="Bot pausado"
                                     aria-label="Bot pausado"
                                 />
@@ -103,7 +107,7 @@ export default function ChatSidebarItem({ chat, isSelected, hasAlert, searchTerm
                     </div>
                     <span className={cn(
                         'text-[11px] font-mono tabular-nums flex-shrink-0',
-                        isSelected ? 'text-accent-100' : 'text-slate-400 dark:text-slate-500'
+                        isSelected ? 'text-accent-100' : 'text-slate-500 dark:text-slate-400'
                     )}>
                         {chat.time}
                     </span>
@@ -120,7 +124,7 @@ export default function ChatSidebarItem({ chat, isSelected, hasAlert, searchTerm
                         >
                             <span className={cn(
                                 'text-[10px] uppercase font-medium mr-1',
-                                isSelected ? 'text-white/70' : 'text-slate-400 dark:text-slate-500'
+                                isSelected ? 'text-white/80' : 'text-slate-500 dark:text-slate-400'
                             )}>
                                 {chat.searchSnippetRole === 'user' ? 'cliente' : chat.searchSnippetRole === 'bot' ? 'bot' : ''}
                             </span>
@@ -161,3 +165,5 @@ export default function ChatSidebarItem({ chat, isSelected, hasAlert, searchTerm
         </button>
     );
 }
+
+export default React.memo(ChatSidebarItem);

@@ -25,20 +25,31 @@ function formatDuration(totalSeconds) {
     return `${secs}s`;
 }
 
-// Tick cada segundo mientras haya cuentas online — barato, mantiene la
-// "sesión actual" precisa sin hits a la API.
+// Tick cada segundo mientras la cuenta esté online — barato, mantiene la
+// "sesión actual" precisa sin hits a la API. Lo usa SOLO OnlineTimeLine (la
+// hoja que pinta el reloj): antes vivía en AccountsView y re-renderizaba la
+// vista entera cada segundo. Con la pestaña oculta no corre.
 function useLiveClock(activeMs) {
     const [now, setNow] = useState(() => Date.now());
     useEffect(() => {
-        if (!activeMs) return;
-        const t = setInterval(() => setNow(Date.now()), 1000);
-        return () => clearInterval(t);
+        if (!activeMs) return undefined;
+        let t = null;
+        const stop = () => { if (t) { clearInterval(t); t = null; } };
+        const start = () => {
+            stop();
+            if (document.visibilityState !== 'visible') return;
+            setNow(Date.now());
+            t = setInterval(() => setNow(Date.now()), 1000);
+        };
+        start();
+        document.addEventListener('visibilitychange', start);
+        return () => { stop(); document.removeEventListener('visibilitychange', start); };
     }, [activeMs]);
     return now;
 }
 
 const AccountsView = () => {
-    const { toast } = useToast();
+    const { toast, confirm } = useToast();
     const { loadSellers } = useSeller();
     const [accounts, setAccounts] = useState([]);
     const [sellers, setSellers] = useState([]);
@@ -74,12 +85,12 @@ const AccountsView = () => {
     // Auto-refresh cada 30s para que el "tiempo online" acumulado se mantenga
     // actualizado sin recargas manuales. La sesión actual ticks vía useLiveClock.
     useEffect(() => {
-        const t = setInterval(() => { fetchData(); }, 30_000);
-        return () => clearInterval(t);
+        // Con la pestaña oculta no se pide nada; al volver, se pone al día.
+        const refresh = () => { if (document.visibilityState === 'visible') fetchData(); };
+        const t = setInterval(refresh, 30_000);
+        document.addEventListener('visibilitychange', refresh);
+        return () => { clearInterval(t); document.removeEventListener('visibilitychange', refresh); };
     }, [fetchData]);
-
-    const anyOnlineSince = accounts.find(a => a.onlineSinceMs)?.onlineSinceMs || null;
-    const nowMs = useLiveClock(anyOnlineSince);
 
     // Auto-generar sellerId desde el username cuando se crea una cuenta nueva.
     useEffect(() => {
@@ -138,7 +149,7 @@ const AccountsView = () => {
     };
 
     const handleDelete = async (id, name) => {
-        if (!window.confirm(`¿Desactivar la cuenta de "${name}"?`)) return;
+        if (!(await confirm(`¿Desactivar la cuenta de "${name}"?`))) return;
         try {
             await api.delete(`/api/accounts/${id}`);
             toast.success('Cuenta desactivada');
@@ -228,7 +239,6 @@ const AccountsView = () => {
                                     onResetPw={() => { setPwModal({ id: acc.id, name: acc.name }); setNewPw(''); }}
                                     onSellerAction={sellerAction}
                                     actionLoading={actionLoading}
-                                    nowMs={nowMs}
                                 />
                             ))}
                             {sellerAccounts.length === 0 && (
@@ -259,7 +269,6 @@ const AccountsView = () => {
                                     onResetPw={() => { setPwModal({ id: acc.id, name: acc.name }); setNewPw(''); }}
                                     onSellerAction={sellerAction}
                                     actionLoading={actionLoading}
-                                    nowMs={nowMs}
                                 />
                             ))}
                         </div>
@@ -375,7 +384,7 @@ const AccountsView = () => {
 
 // ─── Sub-componentes ───────────────────────────────────────────
 
-function AccountRow({ acc, rt, isAdmin, onEdit, onDelete, onResetPw, onSellerAction, actionLoading, nowMs }) {
+function AccountRow({ acc, rt, isAdmin, onEdit, onDelete, onResetPw, onSellerAction, actionLoading }) {
     const isRunning = rt?.running;
     const isConnected = rt?.connected;
 
@@ -410,7 +419,6 @@ function AccountRow({ acc, rt, isAdmin, onEdit, onDelete, onResetPw, onSellerAct
                 <OnlineTimeLine
                     totalSeconds={acc.totalOnlineSeconds}
                     onlineSinceMs={acc.onlineSinceMs}
-                    nowMs={nowMs}
                 />
             </div>
 
@@ -471,7 +479,8 @@ function AccountRow({ acc, rt, isAdmin, onEdit, onDelete, onResetPw, onSellerAct
     );
 }
 
-function OnlineTimeLine({ totalSeconds, onlineSinceMs, nowMs }) {
+function OnlineTimeLine({ totalSeconds, onlineSinceMs }) {
+    const nowMs = useLiveClock(onlineSinceMs);
     const currentSessionSec = onlineSinceMs ? Math.max(0, Math.floor((nowMs - onlineSinceMs) / 1000)) : 0;
     const displayTotal = (totalSeconds || 0) + currentSessionSec;
     return (
@@ -482,7 +491,7 @@ function OnlineTimeLine({ totalSeconds, onlineSinceMs, nowMs }) {
             </span>
             {onlineSinceMs && (
                 <>
-                    <span className="text-slate-300 dark:text-slate-600">·</span>
+                    <span className="text-slate-300 dark:text-slate-600" aria-hidden="true">·</span>
                     <span className="text-success-600 dark:text-success-500 font-medium tabular-nums" title="Sesión actual">
                         sesión: {formatDuration(currentSessionSec)}
                     </span>
@@ -495,7 +504,7 @@ function OnlineTimeLine({ totalSeconds, onlineSinceMs, nowMs }) {
 // ─── API Tokens ────────────────────────────────────────────────
 
 function ApiTokensSection() {
-    const { toast } = useToast();
+    const { toast, confirm } = useToast();
     const [tokens, setTokens] = useState([]);
     const [loading, setLoading] = useState(true);
     const [creating, setCreating] = useState(false);
@@ -542,7 +551,7 @@ function ApiTokensSection() {
     };
 
     const handleRevoke = async (id, name) => {
-        if (!confirm(`¿Revocar el token "${name}"? Cualquier app que lo use dejará de funcionar al instante.`)) return;
+        if (!(await confirm(`¿Revocar el token "${name}"? Cualquier app que lo use dejará de funcionar al instante.`))) return;
         try {
             await api.delete(`/api/admin/api-tokens/${id}`);
             toast.success('Token revocado');

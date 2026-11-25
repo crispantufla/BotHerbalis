@@ -11,7 +11,7 @@ import Login from './pages/Login';
 // Protected Route Component
 const ProtectedRoute = ({ children }) => {
     const { user, loading } = useAuth();
-    if (loading) return <div className="h-screen flex items-center justify-center bg-slate-50 dark:bg-slate-900"><div className="w-8 h-8 border-4 border-blue-600 dark:border-indigo-500 border-t-transparent dark:border-t-transparent rounded-full animate-spin"></div></div>;
+    if (loading) return <div className="h-app flex items-center justify-center bg-slate-50 dark:bg-slate-900" role="status" aria-label="Cargando"><div className="w-8 h-8 border-4 border-accent-600 dark:border-accent-500 border-t-transparent dark:border-t-transparent rounded-full animate-spin"></div></div>;
     if (!user) return <Navigate to="/login" replace />;
     return children;
 };
@@ -24,7 +24,7 @@ function App() {
                     <SocketProvider>
                         <SellerProvider>
                             <Router>
-                                <div className="min-h-screen bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
+                                <div className="min-h-app bg-slate-50 dark:bg-slate-900 text-slate-900 dark:text-slate-100 font-sans transition-colors duration-300">
                                     <Routes>
                                         {/* Public Route */}
                                         <Route path="/login" element={<Login />} />

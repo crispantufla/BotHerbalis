@@ -1,8 +1,9 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { createPortal } from 'react-dom';
 import { X, CreditCard, Loader2 } from 'lucide-react';
 import api from '../../../config/axios';
 import { useToast } from '../../ui/Toast';
+import { useDialogA11y } from '../../ui/useDialogA11y';
 
 /**
  * ManualMpLinkModal — Pide un monto al vendedor, genera un link MP real y lo
@@ -29,6 +30,9 @@ const ManualMpLinkModal = ({ isOpen, onClose, template = '', formatTemplate, sug
             setGeneratedLink(null);
         }
     }, [isOpen, suggestedAmount]);
+
+    const uid = useId();
+    const dialogRef = useDialogA11y({ open: isOpen, onClose });
 
     if (!isOpen) return null;
 
@@ -61,50 +65,59 @@ const ManualMpLinkModal = ({ isOpen, onClose, template = '', formatTemplate, sug
         : template.replace(/{{LINK}}/g, generatedLink || '(se completa al generar)');
 
     const modalContent = (
-        <div className="fixed inset-0 z-[99999] flex items-center justify-center p-4">
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4">
             <div className="absolute inset-0 bg-slate-900/60 backdrop-blur-sm" onClick={onClose} />
-            <div className="relative z-10 w-full max-w-lg bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh]">
+            <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={`${uid}-title`}
+                tabIndex={-1}
+                className="relative z-10 w-full max-w-lg bg-white dark:bg-slate-900 rounded-[2rem] shadow-2xl overflow-hidden flex flex-col max-h-[90vh] focus:outline-none"
+            >
                 {/* Header */}
                 <div className="p-5 border-b border-slate-200 dark:border-slate-800 flex justify-between items-center bg-sky-50 dark:bg-sky-900/20">
                     <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full bg-sky-100 dark:bg-sky-900/40 text-sky-600 flex items-center justify-center">
-                            <CreditCard className="w-5 h-5" />
+                        <div className="w-10 h-10 rounded-full bg-sky-100 dark:bg-sky-900/40 text-sky-600 dark:text-sky-400 flex items-center justify-center">
+                            <CreditCard className="w-5 h-5" aria-hidden="true" />
                         </div>
                         <div>
-                            <h2 className="text-lg font-extrabold text-slate-800 dark:text-slate-100">Generar link de Mercado Pago</h2>
-                            <p className="text-xs text-slate-500 font-medium">Crea una preferencia MP con el monto que indiques</p>
+                            <h2 id={`${uid}-title`} className="text-lg font-extrabold text-slate-800 dark:text-slate-100">Generar link de Mercado Pago</h2>
+                            <p className="text-xs text-slate-500 dark:text-slate-400 font-medium">Crea una preferencia MP con el monto que indiques</p>
                         </div>
                     </div>
-                    <button onClick={onClose} className="p-2 text-slate-400 hover:text-slate-600 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors">
-                        <X className="w-5 h-5" />
+                    <button type="button" onClick={onClose} aria-label="Cerrar" className="p-2.5 -mr-0.5 text-slate-500 dark:text-slate-400 hover:text-slate-700 dark:hover:text-slate-200 hover:bg-slate-100 dark:hover:bg-slate-800 rounded-full transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500">
+                        <X className="w-5 h-5" aria-hidden="true" />
                     </button>
                 </div>
 
                 {/* Body */}
                 <div className="p-5 space-y-4 overflow-y-auto custom-scrollbar">
                     <div>
-                        <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Monto en pesos</label>
+                        <label htmlFor={`${uid}-amount`} className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Monto en pesos</label>
                         <div className="relative">
-                            <span className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 font-bold text-base">$</span>
+                            <span aria-hidden="true" className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 font-bold text-base">$</span>
                             <input
+                                id={`${uid}-amount`}
+                                aria-describedby={`${uid}-amount-help`}
                                 type="text"
                                 inputMode="decimal"
                                 value={amount}
                                 onChange={(e) => setAmount(e.target.value)}
                                 placeholder="46900"
                                 disabled={loading}
-                                autoFocus
-                                className="w-full bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-3 text-base focus:outline-none focus:border-sky-400 text-slate-800 dark:text-slate-100 disabled:opacity-50"
+                                data-autofocus
+                                className="w-full bg-white dark:bg-slate-800 border-2 border-slate-200 dark:border-slate-700 rounded-xl pl-8 pr-3 py-3 text-base focus:outline-none focus:border-sky-400 text-slate-800 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 disabled:opacity-50"
                             />
                         </div>
-                        <p className="text-[11px] text-slate-400 mt-1">Sin puntos ni comas — solo el número (ej: <span className="font-mono">46900</span>).</p>
+                        <p id={`${uid}-amount-help`} className="text-[11px] text-slate-500 dark:text-slate-400 mt-1">Sin puntos ni comas — solo el número (ej: <span className="font-mono">46900</span>).</p>
                     </div>
 
                     {/* Live preview */}
                     {template && (
                         <div>
-                            <label className="block text-xs font-bold text-slate-500 uppercase tracking-widest mb-1.5">Vista previa del mensaje</label>
-                            <pre className="bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-[11px] text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed max-h-44 overflow-y-auto font-sans">
+                            <p id={`${uid}-preview`} className="block text-xs font-bold text-slate-500 dark:text-slate-400 uppercase tracking-widest mb-1.5">Vista previa del mensaje</p>
+                            <pre aria-labelledby={`${uid}-preview`} tabIndex={0} className="focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 bg-slate-50 dark:bg-slate-800 border border-slate-200 dark:border-slate-700 rounded-xl p-3 text-[11px] text-slate-700 dark:text-slate-300 whitespace-pre-wrap leading-relaxed max-h-44 overflow-y-auto font-sans">
                                 {previewMessage}
                             </pre>
                         </div>
@@ -120,18 +133,19 @@ const ManualMpLinkModal = ({ isOpen, onClose, template = '', formatTemplate, sug
 
                 {/* Footer */}
                 <div className="p-5 border-t border-slate-200 dark:border-slate-800 bg-slate-50 dark:bg-slate-900 flex justify-end gap-3">
-                    <button onClick={onClose} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
+                    <button type="button" onClick={onClose} className="px-5 py-2.5 rounded-xl font-bold text-slate-600 dark:text-slate-300 hover:bg-slate-200 dark:hover:bg-slate-800 transition-colors">
                         {generatedLink ? 'Cerrar' : 'Cancelar'}
                     </button>
                     {!generatedLink && (
                         <button
+                            type="button"
                             onClick={handleGenerate}
                             disabled={!isValid || loading}
                             className="px-6 py-2.5 rounded-xl font-bold text-white bg-gradient-to-r from-sky-500 to-blue-600 hover:from-sky-600 hover:to-blue-700 shadow-md transition-all flex items-center gap-2 disabled:opacity-60 disabled:cursor-not-allowed"
                         >
                             {loading
-                                ? <Loader2 className="w-4 h-4 animate-spin" />
-                                : <CreditCard className="w-4 h-4" />}
+                                ? <Loader2 className="w-4 h-4 animate-spin motion-reduce:animate-pulse" aria-hidden="true" />
+                                : <CreditCard className="w-4 h-4" aria-hidden="true" />}
                             {loading ? 'Generando…' : 'Generar e insertar'}
                         </button>
                     )}

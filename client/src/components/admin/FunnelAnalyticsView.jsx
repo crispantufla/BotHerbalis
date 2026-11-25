@@ -330,7 +330,7 @@ function FunnelTab({ orderedFunnel, maxEntered, pauseAlerts, reentries }) {
                                 </div>
                                 <div className="flex-1 relative h-6 bg-slate-100 dark:bg-slate-800 rounded overflow-hidden">
                                     <div
-                                        className="absolute inset-y-0 left-0 bg-accent-500 transition-all"
+                                        className="absolute inset-y-0 left-0 bg-accent-500 transition-[width] motion-reduce:transition-none"
                                         style={{ width: `${widthPct}%` }}
                                     />
                                     <div className="absolute inset-0 flex items-center px-2 text-[11px] font-medium text-white drop-shadow tabular-nums">
@@ -507,11 +507,11 @@ function ConversionTab({ ttc, priceObj, abandonment }) {
                                 <div key={h.hour} className="flex-1 flex flex-col items-center gap-1" title={`${h.hour}:00 — ${h.count} abandonos`}>
                                     <div className="flex-1 w-full flex items-end">
                                         <div
-                                            className="w-full bg-danger-500 rounded-t transition-all"
+                                            className="w-full bg-danger-500 rounded-t transition-[height] motion-reduce:transition-none"
                                             style={{ height: `${Math.max(2, heightPct)}%` }}
                                         />
                                     </div>
-                                    <div className="text-[10px] text-slate-500 dark:text-slate-400 tabular-nums">{h.hour}</div>
+                                    <div className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">{h.hour}</div>
                                 </div>
                             );
                         })}
@@ -640,7 +640,7 @@ function FrictionTab({ retries, aiFallback, pauseAlerts }) {
                                     <td className="text-right px-4 py-2 tabular-nums text-warning-600 dark:text-warning-500">{g.b2_3}</td>
                                     <td className={cn(
                                         'text-right px-4 py-2 font-medium tabular-nums',
-                                        g.b4plus > 0 ? 'text-danger-600 dark:text-danger-500' : 'text-slate-400 dark:text-slate-500'
+                                        g.b4plus > 0 ? 'text-danger-600 dark:text-danger-500' : 'text-slate-500 dark:text-slate-400'
                                     )}>{g.b4plus}</td>
                                     <td className={cn(
                                         'text-right px-4 py-2 font-medium tabular-nums',
@@ -654,7 +654,7 @@ function FrictionTab({ retries, aiFallback, pauseAlerts }) {
                                         'text-right px-4 py-2 font-medium tabular-nums',
                                         g.pauseCount > 5 ? 'text-danger-600 dark:text-danger-500'
                                         : g.pauseCount > 0 ? 'text-warning-600 dark:text-warning-500'
-                                        : 'text-slate-400 dark:text-slate-500'
+                                        : 'text-slate-500 dark:text-slate-400'
                                     )}>
                                         {g.pauseCount || '—'}
                                     </td>

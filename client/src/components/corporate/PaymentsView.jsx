@@ -283,7 +283,7 @@ const PaymentsView = ({ onGoToChat }) => {
     const totalApproved = payments.filter(p => p.status === 'approved').reduce((s, p) => s + p.amount, 0);
 
     return (
-        <div className="space-y-4 animate-fade-in">
+        <div className="space-y-4 animate-fade-in motion-reduce:animate-none">
             <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                     <h1 className="text-display text-slate-900 dark:text-slate-100">Administrador de pagos</h1>
@@ -332,7 +332,7 @@ const PaymentsView = ({ onGoToChat }) => {
             {/* Stats row — tipografía agrandada (3xl-4xl) y padding lg para que las
                 tarjetas se sientan presentes en pantalla. Antes con text-xl + p-md
                 quedaban como "captions". */}
-            <div className="grid grid-cols-3 gap-3">
+            <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
                 <Card padding="lg" className="text-center">
                     <p className="text-3xl sm:text-4xl font-semibold tabular-nums text-warning-600 dark:text-warning-500 leading-none">{pendingCount}</p>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium">Pendientes</p>
@@ -341,7 +341,7 @@ const PaymentsView = ({ onGoToChat }) => {
                     <p className="text-3xl sm:text-4xl font-semibold tabular-nums text-success-600 dark:text-success-500 leading-none">{approvedCount}</p>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium">Aprobados</p>
                 </Card>
-                <Card padding="lg" className="text-center">
+                <Card padding="lg" className="text-center col-span-2 md:col-span-1">
                     <p className="text-2xl sm:text-3xl font-semibold tabular-nums text-info-600 dark:text-info-500 leading-none">{formatArs(totalApproved)}</p>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-2 font-medium">Cobrado</p>
                 </Card>
@@ -367,7 +367,7 @@ const PaymentsView = ({ onGoToChat }) => {
                             onChange={e => setMpAmount(e.target.value)}
                             onKeyDown={e => e.key === 'Enter' && handleGenerateLink()}
                             aria-label="Monto en pesos"
-                            leftIcon={() => <span className="text-slate-400 font-medium">$</span>}
+                            leftIcon={() => <span className="text-slate-500 dark:text-slate-400 font-medium">$</span>}
                         />
                     </div>
                     <div className="flex-1">
@@ -409,8 +409,8 @@ const PaymentsView = ({ onGoToChat }) => {
                         {f.label}
                         {f.key === 'pending' && pendingCount > 0 && (
                             <span className={cn(
-                                'inline-flex items-center justify-center rounded-full text-[10px] font-semibold tabular-nums px-1.5 min-w-[1.25rem] h-4',
-                                filter === f.key ? 'bg-white/25 text-white' : 'bg-warning-500 text-white'
+                                'inline-flex items-center justify-center rounded-full text-[11px] font-semibold tabular-nums px-1.5 min-w-[1.25rem] h-4',
+                                filter === f.key ? 'bg-white/25 text-white' : 'bg-warning-100 text-warning-900'
                             )}>
                                 {pendingCount}
                             </span>

@@ -11,6 +11,9 @@ import {
     Button, IconButton, Card, Badge, Input, useToast, cn
 } from '../ui';
 
+// Nombre de cada nivel para lectores de pantalla (el punto de color solo no alcanza).
+const LEVEL_LABEL = { critical: 'crítico', warning: 'advertencia', healthy: 'saludable', unknown: 'sin datos' };
+
 // V7 es el único guion activo desde may-2026. V5/V6 (+ rotación A/B) fueron
 // archivados a archive/ — se conserva el array como SCRIPTS por si en el
 // futuro se reactivara otra variante, pero hoy queda con un único item.
@@ -229,7 +232,7 @@ const SettingsView = ({ status }) => {
     })();
 
     return (
-        <div className="space-y-4 sm:space-y-6 animate-fade-in pb-12">
+        <div className="space-y-4 sm:space-y-6 animate-fade-in motion-reduce:animate-none pb-12">
             {/* Header */}
             <header className="flex flex-col md:flex-row justify-between items-start md:items-center gap-3">
                 <div>
@@ -262,7 +265,7 @@ const SettingsView = ({ status }) => {
                                 <FileText className="w-5 h-5" aria-hidden="true" />
                             </div>
                             <div className="min-w-0">
-                                <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Modelos de venta (A/B)</h3>
+                                <h2 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Modelos de venta (A/B)</h2>
                                 <p className="text-xs text-slate-500 dark:text-slate-400">Rotación y asignación</p>
                             </div>
                         </div>
@@ -272,7 +275,8 @@ const SettingsView = ({ status }) => {
                             leftIcon={resettingStats ? RefreshCw : RotateCcw}
                             onClick={handleResetScriptStats}
                             disabled={resettingStats}
-                            className={resettingStats ? '[&_svg]:animate-spin' : ''}
+                            aria-label="Reiniciar conteo"
+                            className={cn('max-sm:h-10 max-sm:w-10 max-sm:px-0', resettingStats && '[&_svg]:animate-spin')}
                         >
                             <span className="hidden sm:inline">Reiniciar conteo</span>
                         </Button>
@@ -287,8 +291,9 @@ const SettingsView = ({ status }) => {
                                     key={script.id}
                                     type="button"
                                     onClick={() => handleSwitchScript(script.id)}
+                                    aria-pressed={isActive}
                                     className={cn(
-                                        'p-3 rounded-control border text-left transition-all',
+                                        'p-3 rounded-control border text-left transition-colors',
                                         'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500',
                                         isActive
                                             ? 'border-accent-500 bg-accent-50/50 dark:bg-accent-900/15 shadow-card-hover'
@@ -299,8 +304,8 @@ const SettingsView = ({ status }) => {
                                     <div className="flex items-start gap-2 mb-2">
                                         <span className={cn(
                                             'w-2 h-2 rounded-full mt-1.5 flex-shrink-0',
-                                            isActive ? `${levelColor('healthy')} animate-pulse` : 'bg-slate-300 dark:bg-slate-600'
-                                        )} />
+                                            isActive ? `${levelColor('healthy')} animate-pulse motion-reduce:animate-none` : 'bg-slate-300 dark:bg-slate-600'
+                                        )} aria-hidden="true" />
                                         <div className="flex-1 min-w-0">
                                             <p className="font-semibold text-sm text-slate-900 dark:text-slate-100">{script.name}</p>
                                             <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 leading-snug">{script.desc}</p>
@@ -315,7 +320,7 @@ const SettingsView = ({ status }) => {
                                                 isActive ? 'text-accent-600 dark:text-accent-400' : 'text-slate-700 dark:text-slate-300'
                                             )}>
                                                 {stats.started > 0 ? Math.round((stats.completed / stats.started) * 100) : 0}%
-                                                <span className="text-[10px] text-slate-400 dark:text-slate-500 font-normal ml-1">
+                                                <span className="text-[11px] text-slate-500 dark:text-slate-400 font-normal ml-1">
                                                     ({stats.completed}/{stats.started})
                                                 </span>
                                             </span>
@@ -334,7 +339,7 @@ const SettingsView = ({ status }) => {
                             <KeyRound className="w-5 h-5" aria-hidden="true" />
                         </div>
                         <div>
-                            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Cambiar contraseña</h3>
+                            <h2 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Cambiar contraseña</h2>
                             <p className="text-xs text-slate-500 dark:text-slate-400">Tu cuenta</p>
                         </div>
                     </div>
@@ -449,9 +454,9 @@ const SettingsView = ({ status }) => {
                             <Laptop className="w-5 h-5" aria-hidden="true" />
                         </div>
                         <div className="flex-1 min-w-0 flex flex-col">
-                            <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-1">
+                            <h2 className="font-semibold text-slate-900 dark:text-slate-100 text-sm mb-1">
                                 Cliente del bot (PC del vendedor)
-                            </h3>
+                            </h2>
                             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-4 max-w-md">
                                 Descargá el instalador y copialo a la PC del vendedor. Con un doble click deja
                                 todo listo: instala lo necesario, conecta con el servidor y crea el acceso
@@ -479,9 +484,9 @@ const SettingsView = ({ status }) => {
                             <Power className="w-5 h-5" aria-hidden="true" />
                         </div>
                         <div className="flex-1 min-w-0 flex flex-col">
-                            <h3 className="font-semibold text-danger-700 dark:text-danger-500 text-sm mb-1">
+                            <h2 className="font-semibold text-danger-700 dark:text-danger-500 text-sm mb-1">
                                 Interrupción fuerte
-                            </h3>
+                            </h2>
                             <p className="text-xs text-slate-600 dark:text-slate-400 leading-relaxed mb-4 max-w-md">
                                 Cerrar la sesión desconecta inmediatamente el dispositivo vinculado de WhatsApp.
                                 Ningún mensaje será respondido luego de esta acción.
@@ -503,7 +508,7 @@ const SettingsView = ({ status }) => {
                                 <HardDrive className="w-5 h-5" aria-hidden="true" />
                             </div>
                             <div>
-                                <h3 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Gestión de memoria</h3>
+                                <h2 className="font-semibold text-slate-900 dark:text-slate-100 text-sm">Gestión de memoria</h2>
                                 <p className="text-xs text-slate-500 dark:text-slate-400">Estados de conversación</p>
                             </div>
                         </div>
@@ -526,7 +531,7 @@ const SettingsView = ({ status }) => {
                                 <div className="flex justify-between text-xs mb-2">
                                     <span className="font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                                         RAM del proceso
-                                        <span className={cn('w-1.5 h-1.5 rounded-full', levelColor(rssLevel))} />
+                                        <span role="img" aria-label={`Nivel: ${LEVEL_LABEL[rssLevel]}`} className={cn('w-1.5 h-1.5 rounded-full', levelColor(rssLevel))} />
                                     </span>
                                     <span className="font-mono text-slate-600 dark:text-slate-400 tabular-nums">
                                         {(memStats.rssMB / 1024).toFixed(1)} GB / 32 GB
@@ -534,13 +539,13 @@ const SettingsView = ({ status }) => {
                                 </div>
                                 <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
                                     <div
-                                        className={cn('h-full rounded-full transition-all duration-700', levelColor(rssLevel))}
+                                        className={cn('h-full rounded-full transition-[width] duration-700 motion-reduce:transition-none', levelColor(rssLevel))}
                                         style={{ width: `${Math.max(3, rssPercent)}%` }}
                                     />
                                 </div>
                                 <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-1 tabular-nums">
                                     <span>0</span>
-                                    <span className="text-warning-600 dark:text-warning-500">⚠ {(memStats.thresholds.rssWarnMB / 1024).toFixed(0)} GB</span>
+                                    <span className="text-warning-700 dark:text-warning-500"><span aria-hidden="true">⚠ </span><span className="sr-only">Aviso desde </span>{(memStats.thresholds.rssWarnMB / 1024).toFixed(0)} GB</span>
                                     <span className="text-danger-600 dark:text-danger-500">{(memStats.thresholds.rssCritMB / 1024).toFixed(0)} GB</span>
                                 </div>
                             </div>
@@ -550,7 +555,7 @@ const SettingsView = ({ status }) => {
                                 <div className="flex justify-between text-xs mb-2">
                                     <span className="font-medium text-slate-700 dark:text-slate-300 flex items-center gap-1.5">
                                         Usuarios en base de datos
-                                        <span className={cn('w-1.5 h-1.5 rounded-full', levelColor(usersLevel))} />
+                                        <span role="img" aria-label={`Nivel: ${LEVEL_LABEL[usersLevel]}`} className={cn('w-1.5 h-1.5 rounded-full', levelColor(usersLevel))} />
                                     </span>
                                     <span className="font-mono text-slate-600 dark:text-slate-400 tabular-nums">
                                         {memStats.totalUsersDB.toLocaleString()}
@@ -558,13 +563,13 @@ const SettingsView = ({ status }) => {
                                 </div>
                                 <div className="w-full bg-slate-100 dark:bg-slate-800 rounded-full h-2.5 overflow-hidden">
                                     <div
-                                        className={cn('h-full rounded-full transition-all duration-700', levelColor(usersLevel))}
+                                        className={cn('h-full rounded-full transition-[width] duration-700 motion-reduce:transition-none', levelColor(usersLevel))}
                                         style={{ width: `${Math.max(3, usersPercent)}%` }}
                                     />
                                 </div>
                                 <div className="flex justify-between text-[11px] text-slate-500 dark:text-slate-400 mt-1 tabular-nums">
                                     <span>0</span>
-                                    <span className="text-warning-600 dark:text-warning-500">⚠ {memStats.thresholds.warn.toLocaleString()}</span>
+                                    <span className="text-warning-700 dark:text-warning-500"><span aria-hidden="true">⚠ </span><span className="sr-only">Aviso desde </span>{memStats.thresholds.warn.toLocaleString()}</span>
                                     <span className="text-danger-600 dark:text-danger-500">{memStats.thresholds.danger.toLocaleString()}</span>
                                 </div>
                             </div>

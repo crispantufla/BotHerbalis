@@ -75,7 +75,7 @@ const Button = React.forwardRef(function Button(
         >
             {loading ? (
                 <svg
-                    className={cn('animate-spin', iconSize)}
+                    className={cn('animate-spin motion-reduce:animate-pulse', iconSize)}
                     viewBox="0 0 24 24"
                     fill="none"
                     aria-hidden="true"

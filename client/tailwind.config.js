@@ -1,5 +1,3 @@
-import scrollbar from 'tailwind-scrollbar';
-
 /** @type {import('tailwindcss').Config} */
 export default {
     darkMode: 'class',
@@ -30,21 +28,27 @@ export default {
                 // Semánticos — mismas escalas Tailwind, renombrados por intención.
                 // Resultado: las vistas dicen `text-success-600` en lugar de
                 // adivinar "¿emerald o teal o green?".
+                // Escalas completas (emerald / amber / rose / sky de Tailwind): los
+                // tonos 200-400 y 800 hacen falta para bordes y para el modo oscuro.
                 success: {
-                    50:  '#ecfdf5', 100: '#d1fae5', 500: '#10b981',
-                    600: '#059669', 700: '#047857', 900: '#064e3b',
+                    50:  '#ecfdf5', 100: '#d1fae5', 200: '#a7f3d0', 300: '#6ee7b7',
+                    400: '#34d399', 500: '#10b981', 600: '#059669', 700: '#047857',
+                    800: '#065f46', 900: '#064e3b',
                 },
                 warning: {
-                    50:  '#fffbeb', 100: '#fef3c7', 500: '#f59e0b',
-                    600: '#d97706', 700: '#b45309', 900: '#78350f',
+                    50:  '#fffbeb', 100: '#fef3c7', 200: '#fde68a', 300: '#fcd34d',
+                    400: '#fbbf24', 500: '#f59e0b', 600: '#d97706', 700: '#b45309',
+                    800: '#92400e', 900: '#78350f',
                 },
                 danger: {
-                    50:  '#fff1f2', 100: '#ffe4e6', 500: '#f43f5e',
-                    600: '#e11d48', 700: '#be123c', 900: '#881337',
+                    50:  '#fff1f2', 100: '#ffe4e6', 200: '#fecdd3', 300: '#fda4af',
+                    400: '#fb7185', 500: '#f43f5e', 600: '#e11d48', 700: '#be123c',
+                    800: '#9f1239', 900: '#881337',
                 },
                 info: {
-                    50:  '#f0f9ff', 100: '#e0f2fe', 500: '#0ea5e9',
-                    600: '#0284c7', 700: '#0369a1', 900: '#0c4a6e',
+                    50:  '#f0f9ff', 100: '#e0f2fe', 200: '#bae6fd', 300: '#7dd3fc',
+                    400: '#38bdf8', 500: '#0ea5e9', 600: '#0284c7', 700: '#0369a1',
+                    800: '#075985', 900: '#0c4a6e',
                 },
             },
             // Radii consistentes. Quitamos `rounded-3xl` (24px) y
@@ -64,7 +68,8 @@ export default {
                 'focus-danger': '0 0 0 3px rgb(244 63 94 / 0.25)',
             },
             fontFamily: {
-                sans: ['Inter', 'system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
+                // Pila de sistema: no se carga ninguna fuente web.
+                sans: ['system-ui', '-apple-system', 'BlinkMacSystemFont', 'Segoe UI', 'Roboto', 'sans-serif'],
             },
             fontSize: {
                 // Tipos fluid con `clamp()` para no escribir
@@ -72,18 +77,18 @@ export default {
                 'display': ['clamp(1.5rem, 2vw + 1rem, 2rem)', { lineHeight: '1.15', letterSpacing: '-0.02em', fontWeight: '700' }],
                 'h2':      ['clamp(1.125rem, 1vw + 0.875rem, 1.375rem)', { lineHeight: '1.25', letterSpacing: '-0.01em', fontWeight: '600' }],
             },
+            // Única definición de la entrada `animate-fade-in`. Estaba duplicada
+            // en index.css, que era la que ganaba: estos son sus valores.
             animation: {
-                'fade-in': 'fadeIn 0.3s ease-out',
+                'fade-in': 'fadeIn 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards',
             },
             keyframes: {
                 fadeIn: {
-                    '0%': { opacity: '0', transform: 'translateY(4px)' },
+                    '0%': { opacity: '0', transform: 'translateY(5px)' },
                     '100%': { opacity: '1', transform: 'translateY(0)' },
                 },
             },
         },
     },
-    plugins: [
-        scrollbar,
-    ],
+    plugins: [],
 }

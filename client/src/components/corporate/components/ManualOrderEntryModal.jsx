@@ -1,5 +1,6 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useId } from 'react';
 import { X, Save, Home, Store, CreditCard, Banknote, Send, Pill, Droplet, Leaf } from 'lucide-react';
+import { useDialogA11y } from '../../ui/useDialogA11y';
 
 /**
  * Modal de verificación / carga de pedido.
@@ -79,6 +80,10 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
         });
     }, [open, prefill]);
 
+    const uid = useId();
+    // Mientras guarda, Escape no cierra (igual que la X, que queda deshabilitada).
+    const dialogRef = useDialogA11y({ open, onClose, closeOnEscape: !submitting });
+
     if (!open) return null;
 
     const isSucursal = data.shippingType === 'sucursal';
@@ -153,24 +158,38 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
     };
 
     return (
-        <div className="fixed inset-0 z-[10000] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}>
-            <div className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md p-6 relative max-h-[92vh] overflow-y-auto custom-scrollbar" onClick={e => e.stopPropagation()}>
-                <button onClick={onClose} className="absolute top-3 right-3 p-1.5 text-slate-400 hover:text-rose-500 transition-colors" disabled={submitting}>
-                    <X className="w-5 h-5" />
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-4 bg-slate-900/60 backdrop-blur-sm" onClick={onClose}>
+            <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={`${uid}-title`}
+                tabIndex={-1}
+                className="bg-white dark:bg-slate-800 rounded-2xl shadow-2xl w-full max-w-md p-6 relative max-h-[92vh] overflow-y-auto custom-scrollbar focus:outline-none"
+                onClick={e => e.stopPropagation()}
+            >
+                <button
+                    type="button"
+                    onClick={onClose}
+                    aria-label="Cerrar"
+                    className="absolute top-2 right-2 p-2.5 rounded-control text-slate-500 dark:text-slate-400 hover:text-danger-500 transition-colors disabled:opacity-50 focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500"
+                    disabled={submitting}
+                >
+                    <X className="w-5 h-5" aria-hidden="true" />
                 </button>
 
                 <div className="mb-4">
-                    <h3 className="text-lg font-extrabold text-slate-800 dark:text-slate-100">Verificar pedido</h3>
+                    <h3 id={`${uid}-title`} className="text-lg font-extrabold text-slate-800 dark:text-slate-100">Verificar pedido</h3>
                     <p className="text-xs text-slate-500 dark:text-slate-400 mt-1">
                         Revisá los datos antes de confirmar. Ajustá lo que haga falta.
-                        {chatId && <span className="block mt-1 font-mono text-[11px] text-slate-400">+{chatId.split('@')[0]}</span>}
+                        {chatId && <span className="block mt-1 font-mono text-[11px] text-slate-500 dark:text-slate-400">+{chatId.split('@')[0]}</span>}
                     </p>
                 </div>
 
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {/* Producto */}
-                    <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Producto</label>
+                    <div role="group" aria-labelledby={`${uid}-product`}>
+                        <p id={`${uid}-product`} className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Producto</p>
                         {productDetected ? (
                             <div className="px-3 py-2.5 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700">
                                 <span className="text-sm font-semibold text-slate-700 dark:text-slate-200">{prefill.product}</span>
@@ -206,8 +225,8 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                     </div>
 
                     {/* Tipo de envío */}
-                    <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Tipo de envío</label>
+                    <div role="group" aria-labelledby={`${uid}-shipping`}>
+                        <p id={`${uid}-shipping`} className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Tipo de envío</p>
                         <div className="grid grid-cols-2 gap-2">
                             <SelectorButton active={!isSucursal} icon={Home} label="A domicilio" onClick={() => setShipping('domicilio')} disabled={submitting} />
                             <SelectorButton active={isSucursal} icon={Store} label="Retiro en sucursal" onClick={() => setShipping('sucursal')} disabled={submitting} />
@@ -215,8 +234,8 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                     </div>
 
                     {/* Método de pago (acoplado al envío) */}
-                    <div>
-                        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Método de pago</label>
+                    <div role="group" aria-labelledby={`${uid}-payment`}>
+                        <p id={`${uid}-payment`} className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1.5">Método de pago</p>
                         <div className={`grid gap-2 ${PAY_OPTIONS[data.shippingType].length > 1 ? 'grid-cols-2' : 'grid-cols-1'}`}>
                             {PAY_OPTIONS[data.shippingType].map(opt => (
                                 <SelectorButton
@@ -256,21 +275,21 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
 
                     {/* Datos */}
                     <div className="space-y-3 pt-1">
-                        <Field label="Nombre y apellido *" value={data.nombre} onChange={v => handleField('nombre', v)} placeholder="María Pérez" />
+                        <Field required label="Nombre y apellido *" value={data.nombre} onChange={v => handleField('nombre', v)} placeholder="María Pérez" />
 
                         {!isSucursal && (
-                            <Field label="Calle y número *" value={data.calle} onChange={v => handleField('calle', v)} placeholder="Av. Belgrano 1234" />
+                            <Field required label="Calle y número *" value={data.calle} onChange={v => handleField('calle', v)} placeholder="Av. Belgrano 1234" />
                         )}
 
                         <div className="grid grid-cols-2 gap-3">
-                            <Field label="Ciudad *" value={data.ciudad} onChange={v => handleField('ciudad', v)} placeholder="Rosario" />
-                            <Field label={isSucursal ? 'CP *' : 'CP'} value={data.cp} onChange={v => handleField('cp', v)} placeholder="2000" />
+                            <Field required label="Ciudad *" value={data.ciudad} onChange={v => handleField('ciudad', v)} placeholder="Rosario" />
+                            <Field required={isSucursal} label={isSucursal ? 'CP *' : 'CP'} value={data.cp} onChange={v => handleField('cp', v)} placeholder="2000" />
                         </div>
 
                         <Field label="Provincia" value={data.provincia} onChange={v => handleField('provincia', v)} placeholder="Santa Fe" />
 
                         {isSucursal && (
-                            <p className="text-[11px] text-slate-400 dark:text-slate-500">
+                            <p className="text-[11px] text-slate-500 dark:text-slate-400">
                                 Con la ciudad y el CP, el Correo asigna la sucursal más cercana. No hace falta la calle.
                             </p>
                         )}
@@ -283,16 +302,17 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                             <span className="font-semibold text-slate-700 dark:text-slate-200">{baseTotal ? `$${fmt(baseTotal)}` : '—'}</span>
                         </div>
                         <div className="flex items-center justify-between gap-3">
-                            <label className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">Descuento</label>
+                            <label htmlFor={`${uid}-discount`} className="text-sm text-slate-500 dark:text-slate-400 whitespace-nowrap">Descuento</label>
                             <div className="relative w-32">
-                                <span className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 text-sm">$</span>
+                                <span aria-hidden="true" className="absolute left-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 text-sm">$</span>
                                 <input
+                                    id={`${uid}-discount`}
                                     type="text"
                                     inputMode="numeric"
                                     value={data.discount}
                                     onChange={e => handleField('discount', onlyDigits(e.target.value))}
                                     placeholder="0"
-                                    className="w-full pl-6 pr-2 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-sm text-right text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-300"
+                                    className="w-full pl-6 pr-2 py-1.5 rounded-lg bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-base md:text-sm text-right text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-300 dark:focus:border-accent-500"
                                 />
                             </div>
                         </div>
@@ -314,11 +334,11 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                         <button
                             type="submit"
                             disabled={!isValid || submitting}
-                            className="flex-1 px-4 py-2.5 rounded-xl bg-gradient-to-r from-indigo-600 to-purple-600 text-white font-bold text-sm shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
+                            className="flex-1 px-4 py-2.5 rounded-xl bg-accent-600 hover:bg-accent-700 text-white font-bold text-sm shadow-md hover:shadow-lg disabled:opacity-50 disabled:cursor-not-allowed transition-all flex items-center justify-center gap-2"
                         >
                             {submitting ? (
                                 <>
-                                    <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin"></div>
+                                    <div className="w-4 h-4 border-2 border-white/50 border-t-white rounded-full animate-spin motion-reduce:animate-pulse" aria-hidden="true"></div>
                                     Guardando...
                                 </>
                             ) : silent ? (
@@ -334,7 +354,7 @@ const ManualOrderEntryModal = ({ open, prefill = {}, chatId, silent = false, onC
                             )}
                         </button>
                     </div>
-                    <p className="text-[11px] text-slate-400 dark:text-slate-500 text-center">
+                    <p className="text-[11px] text-slate-500 dark:text-slate-400 text-center">
                         {silent ? 'Se registra la venta sin enviar mensaje al cliente.' : 'Se envía la confirmación al cliente.'} · * obligatorios
                     </p>
                 </form>
@@ -348,28 +368,35 @@ const SelectorButton = ({ active, icon: Icon, label, onClick, disabled }) => (
         type="button"
         onClick={onClick}
         disabled={disabled}
+        aria-pressed={active}
         className={`flex items-center justify-center gap-2 px-3 py-2.5 rounded-xl border text-sm font-bold transition-all disabled:opacity-50 ${
             active
                 ? 'border-indigo-500 bg-indigo-50 dark:bg-indigo-900/30 text-indigo-700 dark:text-indigo-300 ring-2 ring-indigo-500/20'
                 : 'border-slate-200 dark:border-slate-700 bg-slate-50 dark:bg-slate-900 text-slate-600 dark:text-slate-300 hover:border-slate-300 dark:hover:border-slate-600'
         }`}
     >
-        {Icon && <Icon className="w-4 h-4" />}
+        {Icon && <Icon className="w-4 h-4" aria-hidden="true" />}
         <span>{label}</span>
     </button>
 );
 
-const Field = ({ label, value, onChange, placeholder }) => (
-    <div>
-        <label className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">{label}</label>
-        <input
-            type="text"
-            value={value}
-            onChange={e => onChange(e.target.value)}
-            placeholder={placeholder}
-            className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-indigo-500/30 focus:border-indigo-300 transition-all placeholder:text-slate-400"
-        />
-    </div>
-);
+const Field = ({ label, value, onChange, placeholder, required = false }) => {
+    const id = useId();
+    return (
+        <div>
+            <label htmlFor={id} className="block text-[11px] font-bold uppercase tracking-wider text-slate-500 dark:text-slate-400 mb-1">{label}</label>
+            {/* 16px en móvil: con menos, iOS hace zoom al enfocar. */}
+            <input
+                id={id}
+                type="text"
+                value={value}
+                onChange={e => onChange(e.target.value)}
+                placeholder={placeholder}
+                aria-required={required || undefined}
+                className="w-full px-3 py-2 rounded-lg bg-slate-50 dark:bg-slate-900 border border-slate-200 dark:border-slate-700 text-base md:text-sm text-slate-800 dark:text-slate-100 focus:outline-none focus:ring-2 focus:ring-accent-500/30 focus:border-accent-300 dark:focus:border-accent-500 transition-all placeholder:text-slate-400 dark:placeholder:text-slate-500"
+            />
+        </div>
+    );
+};
 
 export default ManualOrderEntryModal;

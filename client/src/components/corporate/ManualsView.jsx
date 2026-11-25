@@ -960,7 +960,7 @@ const ManualsView = () => {
                             onClick={() => setActiveManual(manual.id)}
                             className={cn(
                                 'group text-left rounded-card bg-white dark:bg-slate-800/60 border border-slate-200/70 dark:border-slate-700/70',
-                                'shadow-card p-5 transition-all duration-200 hover:shadow-card-hover hover:border-accent-300 dark:hover:border-accent-700',
+                                'shadow-card p-5 transition-[box-shadow,border-color] duration-200 hover:shadow-card-hover hover:border-accent-300 dark:hover:border-accent-700',
                                 'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500'
                             )}
                         >
@@ -969,7 +969,7 @@ const ManualsView = () => {
                             </div>
                             <h3 className="text-base font-semibold text-slate-900 dark:text-slate-100 mb-1">{manual.title}</h3>
                             <p className="text-xs text-slate-500 dark:text-slate-400 leading-relaxed">{manual.description}</p>
-                            <div className="flex items-center gap-1 text-accent-600 dark:text-accent-400 text-xs font-medium mt-3 group-hover:gap-1.5 transition-all">
+                            <div className="flex items-center gap-1 text-accent-600 dark:text-accent-400 text-xs font-medium mt-3 group-hover:gap-1.5 transition-[gap] motion-reduce:transition-none">
                                 Ver manual <ChevronRight className="w-3.5 h-3.5" aria-hidden="true" />
                             </div>
                         </button>

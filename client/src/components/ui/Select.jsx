@@ -2,9 +2,10 @@ import React from 'react';
 import { ChevronDown } from 'lucide-react';
 import { cn } from './cn';
 
+// Por debajo de `md`, 16px de fuente: con menos, iOS hace zoom al enfocar.
 const SIZES = {
-    sm: 'h-8 text-xs pl-3 pr-8',
-    md: 'h-10 text-sm pl-3 pr-9',
+    sm: 'h-8 text-xs max-md:text-base pl-3 pr-8',
+    md: 'h-10 text-sm max-md:text-base pl-3 pr-9',
     lg: 'h-12 text-base pl-4 pr-10',
 };
 
@@ -66,7 +67,7 @@ const Select = React.forwardRef(function Select(
                 <ChevronDown
                     aria-hidden="true"
                     className={cn(
-                        'absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 pointer-events-none',
+                        'absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 dark:text-slate-500 pointer-events-none',
                         size === 'sm' ? 'w-3.5 h-3.5' : 'w-4 h-4'
                     )}
                 />

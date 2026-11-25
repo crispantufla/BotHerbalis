@@ -14,8 +14,12 @@ const VARIANTS = {
         'text-slate-400 dark:text-slate-500 hover:bg-danger-50 dark:hover:bg-danger-900/30 hover:text-danger-600 dark:hover:text-danger-400',
 };
 
+// `sm` mide 32px. Por debajo de `md` un ::before invisible lo agranda a 40px de
+// zona táctil sin mover nada: las filas densas (encabezado del chat) no cambian.
+// El `relative` que necesita va con especificidad cero (`:where`) para que un
+// `absolute` pasado por `className` siga ganando.
 const SIZES = {
-    sm: 'w-8 h-8 [&_svg]:w-4 [&_svg]:h-4',
+    sm: "w-8 h-8 [&_svg]:w-4 [&_svg]:h-4 [:where(&)]:relative max-md:before:absolute max-md:before:-inset-1 max-md:before:content-['']",
     md: 'w-10 h-10 [&_svg]:w-5 [&_svg]:h-5',
 };
 

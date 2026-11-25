@@ -88,17 +88,17 @@ function OrderCard({ order, onShip }) {
             {/* Datos de envío */}
             <div className="rounded-control bg-slate-50 dark:bg-slate-800/50 p-3 text-sm space-y-1.5">
                 <p className="flex items-center gap-2 font-semibold text-slate-900 dark:text-slate-100">
-                    <User className="w-4 h-4 text-slate-400" /> {nombre || '—'}
+                    <User className="w-4 h-4 text-slate-400" aria-hidden="true" /> {nombre || '—'}
                 </p>
                 <p className="flex items-center gap-2 text-slate-600 dark:text-slate-400">
-                    <MapPin className="w-4 h-4 text-slate-400 flex-shrink-0" /> {addressLine || '—'}
+                    <MapPin className="w-4 h-4 text-slate-400 flex-shrink-0" aria-hidden="true" /> {addressLine || '—'}
                 </p>
                 <div className="flex flex-wrap gap-x-4 gap-y-1 text-slate-600 dark:text-slate-400">
                     {order.email && (
-                        <span className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-slate-400" /> {order.email}</span>
+                        <span className="flex items-center gap-1.5"><Mail className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" /> {order.email}</span>
                     )}
                     {order.telefono && (
-                        <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-slate-400" /> {order.telefono}</span>
+                        <span className="flex items-center gap-1.5"><Phone className="w-3.5 h-3.5 text-slate-400" aria-hidden="true" /> {order.telefono}</span>
                     )}
                 </div>
                 {order.notas && (
@@ -114,7 +114,7 @@ function OrderCard({ order, onShip }) {
                     {order.tracking && (
                         <span className="text-slate-600 dark:text-slate-300">· Seguimiento: <span className="font-medium">{order.tracking}</span></span>
                     )}
-                    {order.shippedAt && <span className="text-xs text-slate-400">· {fullDate(order.shippedAt)}</span>}
+                    {order.shippedAt && <span className="text-xs text-slate-500 dark:text-slate-400">· {fullDate(order.shippedAt)}</span>}
                     <button
                         type="button"
                         onClick={() => onShip(order.id, false)}
@@ -204,7 +204,7 @@ const WebOrdersView = () => {
     const visible = onlyToShip ? orders.filter(o => o.status === 'approved' && !o.shipped) : orders;
 
     return (
-        <div className="space-y-4 animate-fade-in">
+        <div className="space-y-4 animate-fade-in motion-reduce:animate-none">
             <header className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
                 <div>
                     <h1 className="text-display text-slate-900 dark:text-slate-100">Pedidos web</h1>
@@ -262,7 +262,7 @@ const WebOrdersView = () => {
                         'ml-auto inline-flex items-center gap-1.5 px-3 h-8 rounded-control text-xs font-semibold transition-colors',
                         'focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500',
                         onlyToShip
-                            ? 'bg-warning-500 text-white'
+                            ? 'bg-warning-100 text-warning-900 border border-warning-500 dark:bg-warning-900/40 dark:text-warning-100 dark:border-warning-600'
                             : 'bg-white dark:bg-slate-800 border border-slate-200 dark:border-slate-700 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-700/50'
                     )}
                 >

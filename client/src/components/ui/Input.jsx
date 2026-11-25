@@ -6,9 +6,12 @@ import { cn } from './cn';
 // helperText cuando invalid=true. Mantenemos esto separado de los formularios
 // complejos — para forms con muchos campos podríamos meter react-hook-form,
 // pero hoy las vistas tienen formularios chicos (1-3 inputs) que no lo justifican.
+// Por debajo de `md` la fuente sube a 16px: con menos, iOS hace zoom al enfocar.
+// Va como `max-md:` (y no `text-base md:text-sm`) para no pisar en escritorio un
+// tamaño que la vista pase por `className`.
 const SIZES = {
-    sm: 'h-8 text-xs',
-    md: 'h-10 text-sm',
+    sm: 'h-8 text-xs max-md:text-base',
+    md: 'h-10 text-sm max-md:text-base',
     lg: 'h-12 text-base',
 };
 

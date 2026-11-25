@@ -1,30 +1,43 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback, useMemo, useRef } from 'react';
 
 const ThemeContext = createContext();
 
 export const useTheme = () => useContext(ThemeContext);
 
-export const ThemeProvider = ({ children }) => {
-    const [isDark, setIsDark] = useState(() => {
-        const saved = localStorage.getItem('herbalis-theme');
+const STORAGE_KEY = 'herbalis-theme';
+
+// Sin preferencia guardada, arranca con el tema del sistema.
+const getInitialTheme = () => {
+    try {
+        const saved = localStorage.getItem(STORAGE_KEY);
         if (saved) return saved === 'dark';
-        return false; // Default: light mode
-    });
+    } catch { /* sin localStorage: se usa el tema del sistema */ }
+    return typeof window !== 'undefined'
+        && !!window.matchMedia?.('(prefers-color-scheme: dark)').matches;
+};
+
+export const ThemeProvider = ({ children }) => {
+    const [isDark, setIsDark] = useState(getInitialTheme);
+
+    // La preferencia se guarda recién cuando la persona elige: mientras no toque
+    // el interruptor, cada carga sigue al sistema.
+    const userChose = useRef(false);
 
     useEffect(() => {
-        const root = document.documentElement;
-        if (isDark) {
-            root.classList.add('dark', 'dark-mode');
-        } else {
-            root.classList.remove('dark', 'dark-mode');
-        }
-        localStorage.setItem('herbalis-theme', isDark ? 'dark' : 'light');
+        document.documentElement.classList.toggle('dark', isDark);
+        if (!userChose.current) return;
+        try { localStorage.setItem(STORAGE_KEY, isDark ? 'dark' : 'light'); } catch { /* no se pudo guardar */ }
     }, [isDark]);
 
-    const toggleTheme = () => setIsDark(prev => !prev);
+    const toggleTheme = useCallback(() => {
+        userChose.current = true;
+        setIsDark(prev => !prev);
+    }, []);
+
+    const value = useMemo(() => ({ isDark, toggleTheme }), [isDark, toggleTheme]);
 
     return (
-        <ThemeContext.Provider value={{ isDark, toggleTheme }}>
+        <ThemeContext.Provider value={value}>
             {children}
         </ThemeContext.Provider>
     );

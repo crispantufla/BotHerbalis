@@ -1,8 +1,9 @@
-import React, { useEffect } from 'react';
+import React, { useId } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from './cn';
 import IconButton from './IconButton';
+import { useDialogA11y } from './useDialogA11y';
 
 // Modal con backdrop, ESC para cerrar, click fuera para cerrar (opcional).
 // El cliente decide el contenido vía `Modal.Body` / `Modal.Footer`.
@@ -12,6 +13,10 @@ import IconButton from './IconButton';
 //   size: 'sm' | 'md' | 'lg' | 'fullscreen-mobile'
 //   title, subtitle, statusSlot (opcional, va en header)
 //   closeOnBackdrop: bool (default true)
+//   ariaLabel: nombre accesible cuando no hay `title` (opcional)
+//
+// Foco atrapado, Escape, devolución del foco y bloqueo de scroll: `useDialogA11y`.
+// Para que un campo reciba el foco al abrir, ponerle `data-autofocus`.
 const SIZES = {
     sm:                 'max-w-sm',
     md:                 'max-w-md',
@@ -27,20 +32,11 @@ export default function Modal({
     statusSlot,
     size = 'md',
     closeOnBackdrop = true,
+    ariaLabel,
     children,
 }) {
-    useEffect(() => {
-        if (!open) return;
-        const onKey = (e) => { if (e.key === 'Escape') onClose?.(); };
-        document.addEventListener('keydown', onKey);
-        // bloqueamos scroll del body mientras está abierto
-        const prevOverflow = document.body.style.overflow;
-        document.body.style.overflow = 'hidden';
-        return () => {
-            document.removeEventListener('keydown', onKey);
-            document.body.style.overflow = prevOverflow;
-        };
-    }, [open, onClose]);
+    const titleId = useId();
+    const dialogRef = useDialogA11y({ open, onClose });
 
     if (!open) return null;
 
@@ -50,17 +46,20 @@ export default function Modal({
 
     return createPortal(
         <div
-            className="fixed inset-0 z-[100] flex items-center justify-center animate-fade-in bg-slate-900/40 backdrop-blur-sm p-0 sm:p-4"
+            className="fixed inset-0 z-[100] flex items-center justify-center animate-fade-in motion-reduce:animate-none bg-slate-900/40 backdrop-blur-sm p-0 sm:p-4"
             onClick={closeOnBackdrop ? onClose : undefined}
-            role="dialog"
-            aria-modal="true"
-            aria-labelledby={title ? 'modal-title' : undefined}
         >
             <div
+                ref={dialogRef}
+                role="dialog"
+                aria-modal="true"
+                aria-labelledby={title ? titleId : undefined}
+                aria-label={title ? undefined : ariaLabel}
+                tabIndex={-1}
                 onClick={(e) => e.stopPropagation()}
                 className={cn(
                     'w-full bg-white dark:bg-slate-900 border border-slate-200 dark:border-slate-700',
-                    'shadow-elevated flex flex-col overflow-hidden',
+                    'shadow-elevated flex flex-col overflow-hidden focus:outline-none',
                     radiusClass,
                     sizeClasses,
                 )}
@@ -70,7 +69,7 @@ export default function Modal({
                         <div className="flex items-center gap-2 min-w-0 flex-1">
                             {title && (
                                 <div className="min-w-0">
-                                    <h2 id="modal-title" className="font-semibold text-slate-900 dark:text-slate-100 text-sm leading-tight truncate">
+                                    <h2 id={titleId} className="font-semibold text-slate-900 dark:text-slate-100 text-sm leading-tight truncate">
                                         {title}
                                     </h2>
                                     {subtitle && <p className="text-xs text-slate-500 dark:text-slate-400 mt-0.5 truncate">{subtitle}</p>}

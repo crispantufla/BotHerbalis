@@ -255,7 +255,7 @@ const RescueQueueView = ({ onGoToChat }) => {
                                     <tr key={`${l.phone}-${i}`} className="hover:bg-slate-50/70 dark:hover:bg-slate-800/40 transition-colors">
                                         <td className="px-4 py-2.5">
                                             <p className="font-medium text-sm text-slate-900 dark:text-slate-100">
-                                                {l.name || <span className="text-slate-400 dark:text-slate-500 italic font-normal">sin nombre</span>}
+                                                {l.name || <span className="text-slate-500 dark:text-slate-400 italic font-normal">sin nombre</span>}
                                             </p>
                                             <p className="text-xs font-mono text-slate-500 dark:text-slate-400">{l.phone}</p>
                                         </td>
@@ -268,17 +268,17 @@ const RescueQueueView = ({ onGoToChat }) => {
                                         <td className="px-4 py-2.5 text-xs text-slate-700 dark:text-slate-300">
                                             {l.selectedProduct
                                                 ? l.selectedProduct.split(' de ')[0]
-                                                : <span className="text-slate-400 dark:text-slate-500">—</span>}
+                                                : <span className="text-slate-500 dark:text-slate-400">—</span>}
                                         </td>
                                         <td className="px-4 py-2.5 text-xs text-slate-700 dark:text-slate-300">
                                             {l.selectedPlan
                                                 ? <span className="font-mono tabular-nums">{l.selectedPlan}d</span>
-                                                : <span className="text-slate-400 dark:text-slate-500">—</span>}
+                                                : <span className="text-slate-500 dark:text-slate-400">—</span>}
                                         </td>
                                         <td className="px-4 py-2.5 text-xs text-slate-700 dark:text-slate-300">
                                             {l.cartTotal
                                                 ? <span className="font-semibold tabular-nums">${l.cartTotal}</span>
-                                                : <span className="text-slate-400 dark:text-slate-500">—</span>}
+                                                : <span className="text-slate-500 dark:text-slate-400">—</span>}
                                         </td>
                                         <td className="px-4 py-2.5">
                                             <div className="flex items-center gap-1">
@@ -295,7 +295,7 @@ const RescueQueueView = ({ onGoToChat }) => {
                                                     </Badge>
                                                 )}
                                                 {!l.reengagementSent && !l.secondFollowUpSent && (
-                                                    <span className="text-xs text-slate-400 dark:text-slate-500">—</span>
+                                                    <span className="text-xs text-slate-500 dark:text-slate-400">—</span>
                                                 )}
                                             </div>
                                         </td>

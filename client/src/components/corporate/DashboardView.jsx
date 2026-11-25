@@ -45,8 +45,11 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
             }
         };
         fetchStats();
-        const interval = setInterval(fetchStats, 30000);
-        return () => clearInterval(interval);
+        // Con la pestaña oculta no se pide nada; al volver, se pone al día.
+        const refresh = () => { if (document.visibilityState === 'visible') fetchStats(); };
+        const interval = setInterval(refresh, 30000);
+        document.addEventListener('visibilitychange', refresh);
+        return () => { clearInterval(interval); document.removeEventListener('visibilitychange', refresh); };
     }, [isAdmin]);
 
     const handleAddPhone = async (phoneInput) => {
@@ -186,11 +189,11 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
     // ahora hace toggle individual desde "Pausar este bot" en cada seller.
 
     return (
-        <div className="space-y-5 sm:space-y-7 animate-fade-in relative z-10 w-full">
+        <div className="space-y-5 sm:space-y-7 animate-fade-in motion-reduce:animate-none relative z-10 w-full">
             {/* Header de la vista */}
             <header className="flex flex-col sm:flex-row sm:justify-between sm:items-center gap-3 sm:gap-4">
                 <div className="min-w-0">
-                    <h1 className="text-display text-slate-900 dark:text-slate-100">Dashboard</h1>
+                    <h1 className="text-display text-slate-900 dark:text-slate-100">Inicio</h1>
                     <p className="text-sm text-slate-500 dark:text-slate-400 mt-1">
                         Resumen del sistema y métricas en tiempo real.
                     </p>
@@ -342,7 +345,7 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
                                 onChange={e => { setMpAmount(e.target.value); setMpLink(''); }}
                                 onKeyDown={e => e.key === 'Enter' && handleGenerateMpLink()}
                                 aria-label="Monto en pesos"
-                                leftIcon={() => <span className="text-slate-400 font-medium">$</span>}
+                                leftIcon={() => <span className="text-slate-500 dark:text-slate-400 font-medium">$</span>}
                             />
                             <Button
                                 onClick={handleGenerateMpLink}

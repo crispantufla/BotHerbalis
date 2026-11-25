@@ -88,32 +88,50 @@ function CopyRow({ label, value, editField, mono, editing }) {
             setTimeout(() => setCopied(false), 1500);
         });
     };
-    return (
-        <div
-            onClick={handleCopy}
-            className={`flex items-center justify-between px-5 py-2.5 border-b border-slate-100 dark:border-slate-800 group transition-colors ${
-                !editing ? 'hover:bg-slate-50 dark:hover:bg-slate-800/50 cursor-pointer' : ''
-            }`}
-        >
-            <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400 w-24 sm:w-28 flex-shrink-0">
-                {label}
-            </span>
-            <div className="flex-1 min-w-0 ml-3">
-                {editing && editField ? editField : (
-                    <span className={`text-sm text-slate-900 dark:text-slate-100 block truncate ${mono ? 'font-mono' : 'font-medium'}`}>
-                        {value || '—'}
-                    </span>
-                )}
+    const rowCls = 'flex items-center justify-between w-full text-left px-5 py-2.5 min-h-[44px] border-b border-slate-100 dark:border-slate-800 group transition-colors';
+    const labelEl = (
+        <span className="text-[11px] font-medium uppercase tracking-wide text-slate-500 dark:text-slate-400 w-24 sm:w-28 flex-shrink-0">
+            {label}
+        </span>
+    );
+    // Editando: la fila lleva un <input> adentro, así que no puede ser botón.
+    if (editing) {
+        return (
+            <div className={rowCls}>
+                {labelEl}
+                <div className="flex-1 min-w-0 ml-3">
+                    {editField || (
+                        <span className={`text-sm text-slate-900 dark:text-slate-100 block truncate ${mono ? 'font-mono' : 'font-medium'}`}>
+                            {value || '—'}
+                        </span>
+                    )}
+                </div>
             </div>
-            {!editing && value && (
-                <span className="ml-2 flex-shrink-0 w-4 h-4 flex items-center justify-center">
+        );
+    }
+    return (
+        <button
+            type="button"
+            onClick={handleCopy}
+            aria-label={`Copiar ${label}: ${value || 'sin dato'}`}
+            className={`${rowCls} hover:bg-slate-50 dark:hover:bg-slate-800/50 focus:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-500`}
+        >
+            {labelEl}
+            <span className="flex-1 min-w-0 ml-3">
+                <span className={`text-sm text-slate-900 dark:text-slate-100 block truncate ${mono ? 'font-mono' : 'font-medium'}`}>
+                    {value || '—'}
+                </span>
+            </span>
+            {value && (
+                <span className="ml-2 flex-shrink-0 w-4 h-4 flex items-center justify-center" aria-hidden="true">
                     {copied
                         ? <Check className="w-3.5 h-3.5 text-success-500" />
-                        : <Copy className="w-3.5 h-3.5 text-slate-300 dark:text-slate-600 opacity-0 group-hover:opacity-100 transition-opacity" />
+                        : <Copy className="w-3.5 h-3.5 text-slate-400 dark:text-slate-500 opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-visible:opacity-100 transition-opacity" />
                     }
                 </span>
             )}
-        </div>
+            <span className="sr-only" role="status">{copied ? 'Copiado' : ''}</span>
+        </button>
     );
 }
 
@@ -394,7 +412,7 @@ CP: ${order.cp || '—'}`;
         : orders.filter(o => sellerFilter === 'Todos' || o.seller === sellerFilter);
 
     return (
-        <div className="h-full flex flex-col animate-fade-in relative z-10 w-full gap-4">
+        <div className="h-full flex flex-col animate-fade-in motion-reduce:animate-none relative z-10 w-full gap-4">
 
             {/* Header + Filters */}
             <Card padding="md">
@@ -478,7 +496,7 @@ CP: ${order.cp || '—'}`;
                         Lo más chico (hora, producto, teléfono del vendedor) sube a
                         text-xs (12px); lo principal (nombre cliente) a text-base. */}
                     <table className="w-full text-left border-collapse whitespace-nowrap hidden md:table">
-                        <thead className="bg-slate-50/80 dark:bg-slate-800/40 border-b border-slate-200/70 dark:border-slate-700/70 sticky top-0 z-10 backdrop-blur-sm">
+                        <thead className="bg-slate-50 dark:bg-slate-800 border-b border-slate-200/70 dark:border-slate-700/70 sticky top-0 z-10">
                             <tr className="text-xs uppercase tracking-wide text-slate-500 dark:text-slate-400 font-medium">
                                 <th className="px-4 py-3.5 hidden md:table-cell">Fecha</th>
                                 <th className="px-4 py-3.5 w-full">Cliente</th>
@@ -525,7 +543,7 @@ CP: ${order.cp || '—'}`;
                                                 <div className="flex flex-col whitespace-nowrap leading-tight">
                                                     <span className="text-sm font-medium text-slate-700 dark:text-slate-200 tabular-nums">{datePart}</span>
                                                     {timePart && (
-                                                        <span className="text-xs font-mono text-slate-400 dark:text-slate-500 tabular-nums mt-0.5">{timePart}</span>
+                                                        <span className="text-xs font-mono text-slate-500 dark:text-slate-400 tabular-nums mt-0.5">{timePart}</span>
                                                     )}
                                                 </div>
                                             </td>
@@ -561,12 +579,12 @@ CP: ${order.cp || '—'}`;
                                                             </span>
                                                         )}
                                                         {order.seller && (
-                                                            <span className="text-xs text-slate-400 dark:text-slate-500 font-mono tabular-nums">
+                                                            <span className="text-xs text-slate-500 dark:text-slate-400 font-mono tabular-nums">
                                                                 +{order.seller.replace(/\D/g, '').slice(-10)}
                                                             </span>
                                                         )}
                                                     </div>
-                                                ) : <span className="text-sm text-slate-400">—</span>}
+                                                ) : <span className="text-sm text-slate-500 dark:text-slate-400">—</span>}
                                             </td>
                                             <td className="px-4 py-3.5 text-center">
                                                 <div className="flex flex-col items-center gap-1">
@@ -693,7 +711,7 @@ CP: ${order.cp || '—'}`;
                                         )}
                                         <div className="flex gap-1.5 mt-1">
                                             <Button
-                                                size="sm"
+                                                size="md"
                                                 variant="secondary"
                                                 fullWidth
                                                 onClick={() => { setViewingOrder(order); setTrackingData(null); }}
@@ -709,7 +727,7 @@ CP: ${order.cp || '—'}`;
                                                     ? Check
                                                     : (sendingToSistemaId === order.id ? Loader2 : Send)}
                                                 variant={order.sistemaOrderId ? 'subtle' : 'accent'}
-                                                size="sm"
+                                                size="md"
                                                 disabled={!!order.sistemaOrderId || sendingToSistemaId === order.id}
                                                 className={sendingToSistemaId === order.id ? '[&_svg]:animate-spin' : undefined}
                                                 onClick={() => handleSendToSistema(order)}
@@ -718,14 +736,14 @@ CP: ${order.cp || '—'}`;
                                                 label="Ir al chat"
                                                 icon={MessageCircle}
                                                 variant="subtle"
-                                                size="sm"
+                                                size="md"
                                                 onClick={() => handleGoToChat(order.cliente, order.seller)}
                                             />
                                             <IconButton
                                                 label="Editar"
                                                 icon={Edit2}
                                                 variant="subtle"
-                                                size="sm"
+                                                size="md"
                                                 onClick={() => openEdit(order)}
                                             />
                                             </>)}
@@ -752,7 +770,7 @@ CP: ${order.cp || '—'}`;
                             label="Página anterior"
                             icon={ChevronLeft}
                             variant="ghost"
-                            size="sm"
+                            size="md"
                             disabled={page <= 1 || isFetching}
                             onClick={() => setPage(p => Math.max(1, p - 1))}
                         />
@@ -760,7 +778,7 @@ CP: ${order.cp || '—'}`;
                             label="Página siguiente"
                             icon={ChevronRight}
                             variant="ghost"
-                            size="sm"
+                            size="md"
                             disabled={page >= pagination.totalPages || isFetching}
                             onClick={() => setPage(p => Math.min(pagination.totalPages, p + 1))}
                         />
@@ -896,7 +914,7 @@ CP: ${order.cp || '—'}`;
                                     label="Editar"
                                     icon={Edit2}
                                     variant="ghost"
-                                    size="sm"
+                                    size="md"
                                     onClick={() => startDetailEdit(viewingOrder)}
                                 />
                             ) : (
@@ -913,7 +931,8 @@ CP: ${order.cp || '—'}`;
                                         type="text"
                                         value={detailEditData[field] || ''}
                                         onChange={e => handleDetailField(field, e.target.value)}
-                                        className="w-full text-sm font-medium text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 rounded-control px-3 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 outline-none"
+                                        aria-label={placeholder}
+                                        className="w-full text-base md:text-sm font-medium text-slate-900 dark:text-slate-100 bg-white dark:bg-slate-800 rounded-control px-3 py-1.5 border border-slate-200 dark:border-slate-700 focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20 outline-none"
                                         placeholder={placeholder}
                                     />
                                 );
@@ -995,7 +1014,7 @@ CP: ${order.cp || '—'}`;
                                         </Button>
                                     </div>
                                     {trackingData && (
-                                        <div className="animate-fade-in">
+                                        <div className="animate-fade-in motion-reduce:animate-none">
                                             {trackingData.success ? (
                                                 trackingData.events && trackingData.events.length > 0 ? (
                                                     <ul className="space-y-2.5 ml-1.5 border-l-2 border-accent-100 dark:border-accent-900/50 pl-4">
@@ -1005,7 +1024,7 @@ CP: ${order.cp || '—'}`;
                                                                 <div className="flex flex-col sm:flex-row sm:items-baseline gap-1 sm:gap-3">
                                                                     <span className="text-xs font-medium text-slate-700 dark:text-slate-200 min-w-[100px]">
                                                                         {ev.fecha}
-                                                                        {ev.planta && <span className="text-[10px] text-info-500 font-medium uppercase tracking-wide ml-1.5">{ev.planta}</span>}
+                                                                        {ev.planta && <span className="text-[11px] text-info-700 dark:text-info-500 font-medium uppercase tracking-wide ml-1.5">{ev.planta}</span>}
                                                                     </span>
                                                                     <p className="text-xs text-slate-600 dark:text-slate-400 flex-1">{ev.historia}</p>
                                                                 </div>
@@ -1037,7 +1056,7 @@ CP: ${order.cp || '—'}`;
                                                 <span className="absolute -left-[19px] top-1 w-2.5 h-2.5 rounded-full bg-white dark:bg-slate-900 border-2 border-accent-500" />
                                                 <div className="flex justify-between items-baseline mb-0.5">
                                                     <span className="text-xs font-semibold text-slate-700 dark:text-slate-200">{log.status}</span>
-                                                    <span className="text-[10px] text-slate-400 dark:text-slate-500 tabular-nums">{formatDateBA(log.timestamp)}</span>
+                                                    <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">{formatDateBA(log.timestamp)}</span>
                                                 </div>
                                                 <p className="text-xs text-slate-500 dark:text-slate-400">{log.message}</p>
                                             </li>

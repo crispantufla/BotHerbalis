@@ -81,7 +81,7 @@ const SystemStatusPanel = ({ status, adminNumbers = [], onAddPhone, onRemovePhon
                                     className="group flex items-center justify-between bg-slate-50 dark:bg-slate-800/50 border border-slate-200/70 dark:border-slate-700/70 rounded-control px-3 py-2"
                                 >
                                     <div className="flex items-center gap-2.5 min-w-0">
-                                        <span className="w-1.5 h-1.5 rounded-full bg-success-500 flex-shrink-0" />
+                                        <span className="w-1.5 h-1.5 rounded-full bg-success-500 flex-shrink-0" aria-hidden="true" />
                                         <span className="text-sm font-mono text-slate-700 dark:text-slate-200 truncate">+{num}</span>
                                     </div>
                                     <IconButton
@@ -90,7 +90,7 @@ const SystemStatusPanel = ({ status, adminNumbers = [], onAddPhone, onRemovePhon
                                         variant="danger"
                                         size="sm"
                                         onClick={() => onRemovePhone(num)}
-                                        className="opacity-0 group-hover:opacity-100 transition-opacity"
+                                        className="opacity-100 md:opacity-0 md:group-hover:opacity-100 md:group-focus-within:opacity-100 focus-visible:opacity-100 transition-opacity"
                                     />
                                 </li>
                             ))}

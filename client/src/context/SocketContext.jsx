@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import io from 'socket.io-client';
 import { API_URL } from '../config/api';
 import { useAuth } from './AuthContext';
@@ -56,8 +56,10 @@ export const SocketProvider = ({ children }) => {
     }, [user]);
 
     // Let components call socket.emit('switch-seller', id) directly
+    const value = useMemo(() => ({ socket, isConnected }), [socket, isConnected]);
+
     return (
-        <SocketContext.Provider value={{ socket, isConnected }}>
+        <SocketContext.Provider value={value}>
             {children}
         </SocketContext.Provider>
     );

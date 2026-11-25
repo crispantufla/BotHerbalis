@@ -204,7 +204,7 @@ const AlertsPanel = ({ alerts, onCommand, onQuickAction }) => {
                                                 onChange={(e) => setAdminInputs(prev => ({ ...prev, [alert.id]: e.target.value }))}
                                                 placeholder="Instrucción para la IA…"
                                                 aria-label="Instrucción para la IA"
-                                                className="flex-1 h-10 rounded-control bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 px-3 text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
+                                                className="flex-1 min-w-0 h-10 rounded-control bg-white dark:bg-slate-900/40 border border-slate-200 dark:border-slate-700 px-3 text-base md:text-sm text-slate-900 dark:text-slate-100 placeholder:text-slate-400 dark:placeholder:text-slate-500 focus:outline-none focus:border-accent-500 focus:ring-2 focus:ring-accent-500/20"
                                             />
                                             <Button
                                                 type="submit"

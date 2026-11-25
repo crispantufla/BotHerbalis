@@ -11,7 +11,7 @@ const formatDate = (iso) => {
 };
 
 const AiReportsView = () => {
-    const { toast } = useToast();
+    const { toast, confirm } = useToast();
     const [reports, setReports] = useState([]);
     const [loading, setLoading] = useState(true);
     const [expandedId, setExpandedId] = useState(null);
@@ -31,7 +31,7 @@ const AiReportsView = () => {
     useEffect(() => { fetchReports(); }, [fetchReports]);
 
     const handleDelete = async (id) => {
-        if (!window.confirm('¿Eliminar este reporte?')) return;
+        if (!(await confirm('¿Eliminar este reporte?'))) return;
         try {
             await api.delete(`/api/ai-reports/${id}`);
             setReports(prev => prev.filter(r => r.id !== id));
@@ -90,14 +90,14 @@ const AiReportsView = () => {
                                     <div className="flex-1 min-w-0">
                                         <div className="flex items-center gap-2 mb-2 flex-wrap">
                                             {report.userPhone?.startsWith('playground_') ? (
-                                                <span className="inline-flex items-center gap-1 text-[10px] font-bold uppercase tracking-wide text-accent-600 dark:text-accent-400 bg-accent-50 dark:bg-accent-900/30 px-1.5 py-0.5 rounded">
+                                                <span className="inline-flex items-center gap-1 text-[11px] font-bold uppercase tracking-wide text-accent-600 dark:text-accent-400 bg-accent-50 dark:bg-accent-900/30 px-1.5 py-0.5 rounded">
                                                     <FlaskConical className="w-3 h-3" />
                                                     Playground
                                                 </span>
                                             ) : (
                                                 <span className="text-xs font-mono text-slate-600 dark:text-slate-300">+{report.userPhone}</span>
                                             )}
-                                            <span className="text-[10px] text-slate-400 dark:text-slate-500 tabular-nums">
+                                            <span className="text-[11px] text-slate-500 dark:text-slate-400 tabular-nums">
                                                 {formatDate(report.createdAt)}
                                             </span>
                                         </div>
@@ -156,7 +156,7 @@ const AiReportsView = () => {
                                                                 ? 'bg-accent-100 dark:bg-accent-900/30 text-accent-700 dark:text-accent-300'
                                                                 : 'bg-white dark:bg-slate-700 text-slate-700 dark:text-slate-200 border border-slate-200 dark:border-slate-600'
                                                     )}>
-                                                        <span className="font-medium text-[10px] opacity-60 uppercase block mb-0.5 tracking-wide">
+                                                        <span className="font-medium text-[11px] opacity-60 uppercase block mb-0.5 tracking-wide">
                                                             {msg.role === 'bot' ? 'Bot' : 'Usuario'}{msg.isReported ? ' · reportado' : ''}
                                                         </span>
                                                         {msg.body}

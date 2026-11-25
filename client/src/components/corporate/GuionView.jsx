@@ -266,7 +266,7 @@ const GuionView = () => {
     };
 
     return (
-        <div className="max-w-5xl mx-auto w-full space-y-4">
+        <div className="max-w-6xl mx-auto w-full space-y-4">
             {/* Header alineado con el resto del dashboard (SalesView, PaymentsView…):
                 text-display + subtítulo, sin avatar/ícono. El icono FileText queda
                 disponible si en el futuro quisiéramos retomar el patrón con avatar. */}
@@ -299,7 +299,7 @@ const GuionView = () => {
                             {meta.name}
                             {pending > 0 && (
                                 <span className={cn(
-                                    'inline-flex items-center justify-center rounded-full text-[10px] font-semibold px-1.5 min-w-[1.25rem] h-4 tabular-nums',
+                                    'inline-flex items-center justify-center rounded-full text-[11px] font-semibold px-1.5 min-w-[1.25rem] h-4 tabular-nums',
                                     isActive ? 'bg-white/25 text-white' : 'bg-warning-100 dark:bg-warning-900/40 text-warning-700 dark:text-warning-500'
                                 )}>{pending}</span>
                             )}
@@ -326,18 +326,18 @@ const GuionView = () => {
                     <button
                         type="button"
                         onClick={() => setExpandedStages(new Set(STAGE_GROUPS.map(g => g.key)))}
-                        className="text-[11px] font-medium text-accent-600 dark:text-accent-400 hover:underline"
+                        className="inline-flex items-center min-h-[40px] md:min-h-0 text-xs md:text-[11px] font-medium text-accent-600 dark:text-accent-400 hover:underline"
                     >
                         Expandir todo
                     </button>
                     <button
                         type="button"
                         onClick={() => setExpandedStages(new Set())}
-                        className="text-[11px] font-medium text-slate-600 dark:text-slate-400 hover:underline"
+                        className="inline-flex items-center min-h-[40px] md:min-h-0 text-xs md:text-[11px] font-medium text-slate-600 dark:text-slate-400 hover:underline"
                     >
                         Colapsar todo
                     </button>
-                    <label className="flex items-center gap-2 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer">
+                    <label className="flex items-center gap-2 min-h-[40px] md:min-h-0 text-xs font-medium text-slate-600 dark:text-slate-400 cursor-pointer">
                         <input
                             type="checkbox"
                             checked={showResolved}
