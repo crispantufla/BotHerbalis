@@ -1,11 +1,11 @@
 import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react';
-import { Search, MessageCircle } from 'lucide-react';
+import { Search, MessageCircle, Inbox } from 'lucide-react';
 
 import api from '../../config/axios';
 import { useChat } from '../../hooks/useChat';
 import { useSeller } from '../../context/SellerContext';
 
-import { Input, EmptyState, useToast, cn } from '../ui';
+import { Input, EmptyState, Button, useToast, cn } from '../ui';
 
 import ChatMessageList from './components/ChatMessageList';
 import ChatInputArea from './components/ChatInputArea';
@@ -20,7 +20,9 @@ import ScriptPanel from './comms/ScriptPanel';
 import ChatHeader from './comms/ChatHeader';
 import SummaryBanner from './comms/SummaryBanner';
 import ConfirmFillModal from './comms/ConfirmFillModal';
+import ChatFilterChips from './comms/ChatFilterChips';
 import { useChatSearch } from './comms/useChatSearch';
+import { applyChatFilter, countChatFilters, getChatFilter } from './comms/chatFilters';
 import { useScriptFlow } from './comms/useScriptFlow';
 import { formatScriptMessage, extractConfirmationContext, buildConfirmMessage } from './comms/scriptTemplates';
 import { downloadChatHistory } from './comms/chatHistoryText';
@@ -84,6 +86,11 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], o
     }, [chats, selectedChatId, selectedChatFallback]);
 
     const { searchTerm, setSearchTerm, searchResults, isSearching, filteredChats } = useChatSearch(chats);
+    // Filtro rápido de la lista (Todos / Sin responder / Pausados / Clientes).
+    // Se aplica sobre el resultado de la búsqueda; los contadores también.
+    const [chatFilter, setChatFilter] = useState('all');
+    const filterCounts = useMemo(() => countChatFilters(filteredChats), [filteredChats]);
+    const visibleChats = useMemo(() => applyChatFilter(filteredChats, chatFilter), [filteredChats, chatFilter]);
     const { scriptFlow, prices } = useScriptFlow();
 
     // Chat abierto "ahora", para lo que se resuelve después de un await.
@@ -91,7 +98,7 @@ const CommsView = ({ initialChatId, onChatSelected, onChatOpened, alerts = [], o
     useEffect(() => { selectedChatIdRef.current = selectedChatId; }, [selectedChatId]);
 
     // Reset selected chat cuando un admin cambia de seller.
-    useEffect(() => { setSelectedChatId(null); setSelectedChatFallback(null); }, [selectedSellerId]);
+    useEffect(() => { setSelectedChatId(null); setSelectedChatFallback(null); setChatFilter('all'); }, [selectedSellerId]);
 
     // Wrapper que dispara `onChatOpened` (típicamente colapsa el sidebar
     // principal) sólo cuando un chat se selecciona — no al limpiar (null).
@@ -391,6 +398,8 @@ Teléfono: ${phoneDisplay}`;
                     />
                 </div>
 
+                <ChatFilterChips value={chatFilter} counts={filterCounts} onChange={setChatFilter} />
+
                 {/* Avisos de la búsqueda (fuera del scroll: la lista de abajo es virtualizada) */}
                 <div role="status" className="flex-shrink-0">
                     {isSearching && (
@@ -415,9 +424,26 @@ Teléfono: ${phoneDisplay}`;
                             </div>
                         ))}
                     </div>
+                ) : chatFilter !== 'all' && visibleChats.length === 0 && !(searchTerm.trim() && filteredChats.length === 0) ? (
+                    // El filtro dejó la lista vacía (si la vacía es la búsqueda, ya avisa arriba).
+                    <div role="status" className="flex-1 min-h-0 overflow-y-auto">
+                        <EmptyState
+                            icon={Inbox}
+                            title={getChatFilter(chatFilter).empty}
+                            description={searchTerm.trim()
+                                ? 'Ningún resultado de la búsqueda entra en este filtro.'
+                                : undefined}
+                            action={(
+                                <Button variant="secondary" size="md" onClick={() => setChatFilter('all')}>
+                                    Ver todos
+                                </Button>
+                            )}
+                            className="py-10"
+                        />
+                    </div>
                 ) : (
                     <ChatList
-                        chats={filteredChats}
+                        chats={visibleChats}
                         selectedChatId={selectedChatId}
                         alertPhones={alertPhones}
                         searchTerm={searchTerm}

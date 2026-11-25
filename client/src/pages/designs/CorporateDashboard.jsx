@@ -10,8 +10,10 @@ import DashboardView from '../../components/corporate/DashboardView';
 import CommsView from '../../components/corporate/CommsView';
 import ManualOrderEntryModal from '../../components/corporate/components/ManualOrderEntryModal';
 import LazyBoundary from '../../components/ui/LazyBoundary';
+import TabbedView from '../../components/corporate/shell/TabbedView';
+import useBrowserNotifications from '../../hooks/useBrowserNotifications';
 
-import { Gift, Wifi, MessageCircle, ShoppingCart, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, LifeBuoy, MessagesSquare, FlaskConical, Package } from 'lucide-react';
+import { Gift, Wifi, MessageCircle, ShoppingCart, Settings, ImageIcon, LogOut, Menu, X, Moon, Sun, BarChart2, Activity, Bell, AlertTriangle, BookOpen, MoreHorizontal, CreditCard, Users, LifeBuoy, MessagesSquare, FlaskConical, Package, Clock } from 'lucide-react';
 
 // Con el panel bajan solo Inicio y el chat (lo que se abre siempre). El resto de
 // las vistas se descarga al abrir su pestaña; Estadísticas además trae recharts
@@ -53,6 +55,42 @@ const TAB_NAMES = {
 
 // Vistas que manejan su propio alto y scroll (el contenedor no scrollea).
 const FIXED_HEIGHT_TABS = ['comms', 'logistics', 'statistics'];
+
+// Entradas del menú que juntan varias vistas como pestañas. Los ids de cada
+// pestaña son los de siempre: `activeTab` sigue guardando 'logistics',
+// 'payments', etc., así que todo lo que navega a un id viejo abre su grupo en la
+// pestaña correcta. `adminOnly` es la misma regla que tenían en el menú.
+const TAB_GROUPS = [
+    {
+        id: 'sales',
+        label: 'Ventas',
+        tabs: [
+            { id: 'logistics', label: 'Ventas y logística', icon: ShoppingCart },
+            { id: 'payments', label: 'Pagos MP', icon: CreditCard },
+            { id: 'web-orders', label: 'Pedidos web', icon: Package },
+        ],
+    },
+    {
+        id: 'stats',
+        label: 'Estadísticas',
+        tabs: [
+            { id: 'statistics', label: 'Estadísticas', icon: BarChart2 },
+            { id: 'funnel-analytics', label: 'Analítica Embudo', icon: Activity, adminOnly: true },
+            { id: 'account-stats', label: 'Horas Vendedores', icon: Clock, adminOnly: true },
+        ],
+    },
+];
+
+const groupOfTab = (tab) => TAB_GROUPS.find(g => g.tabs.some(t => t.id === tab)) || null;
+
+// Última pestaña abierta de cada grupo (por dispositivo).
+const GROUP_TABS_KEY = 'herbalis_shell_group_tabs';
+const readGroupTabs = () => {
+    try {
+        const saved = JSON.parse(window.localStorage.getItem(GROUP_TABS_KEY) || '{}');
+        return saved && typeof saved === 'object' ? saved : {};
+    } catch { return {}; }
+};
 
 const ViewSpinner = () => (
     <div className="p-6 flex justify-center items-center min-h-[60vh]" role="status" aria-label="Cargando">
@@ -146,10 +184,50 @@ const CorporateDashboard = () => {
         return () => document.removeEventListener('keydown', handleKey);
     }, [mobileMenuOpen]);
 
-    const handleNavSelect = useCallback((tab) => {
+    // Ir a una vista. Si es la pestaña de un grupo, queda anotada como la última
+    // de ese grupo: la próxima vez la entrada del menú abre ahí.
+    const [groupTabs, setGroupTabs] = useState(readGroupTabs);
+    const goToTab = useCallback((tab) => {
         setActiveTab(tab);
-        setMobileMenuOpen(false);
+        const group = groupOfTab(tab);
+        if (!group) return;
+        setGroupTabs(prev => {
+            if (prev[group.id] === tab) return prev;
+            const next = { ...prev, [group.id]: tab };
+            try { window.localStorage.setItem(GROUP_TABS_KEY, JSON.stringify(next)); } catch { /* queda solo en memoria */ }
+            return next;
+        });
     }, []);
+
+    const handleNavSelect = useCallback((tab) => {
+        goToTab(tab);
+        setMobileMenuOpen(false);
+    }, [goToTab]);
+
+    // Pestañas de un grupo que este usuario puede ver.
+    const visibleTabsOf = useCallback(
+        (group) => group.tabs.filter(t => !t.adminOnly || isAdmin),
+        [isAdmin]
+    );
+
+    // Entrada del menú (o de la barra inferior) de un grupo: abre la última
+    // pestaña que se usó, o la primera.
+    const openGroup = useCallback((groupId) => {
+        const group = TAB_GROUPS.find(g => g.id === groupId);
+        if (!group) return;
+        const visible = visibleTabsOf(group);
+        const remembered = visible.find(t => t.id === groupTabs[groupId]);
+        goToTab((remembered || visible[0]).id);
+        setMobileMenuOpen(false);
+    }, [visibleTabsOf, groupTabs, goToTab]);
+
+    // Avisos del navegador con el panel en segundo plano. El clic en el aviso
+    // sigue el mismo camino que el clic en una fila del desplegable; va por ref
+    // porque handleQuickAction se rearma en cada render.
+    const openAlertChatRef = useRef(null);
+    const handleBrowserNotificationOpen = useCallback((alert) => openAlertChatRef.current?.(alert), []);
+    const browserNotifs = useBrowserNotifications({ onOpen: handleBrowserNotificationOpen });
+    const { notify: notifyBrowser, markSeen: markAlertsSeen } = browserNotifs;
 
     // Detección de Mobile
     useEffect(() => {
@@ -234,10 +312,13 @@ const CorporateDashboard = () => {
             // Solo mantenemos la alerta más reciente por userPhone. Si entra una
             // nueva para un cliente que ya tenía alerta, la reemplazamos en lugar
             // de acumular (el backend ya hace la misma dedup sobre sessionAlerts).
-            const handleNewAlert = (newAlert) => setAlerts(prev => [
-                newAlert,
-                ...prev.filter(a => a.userPhone !== newAlert.userPhone),
-            ]);
+            const handleNewAlert = (newAlert) => {
+                notifyBrowser(newAlert);
+                setAlerts(prev => [
+                    newAlert,
+                    ...prev.filter(a => a.userPhone !== newAlert.userPhone),
+                ]);
+            };
             const handleAlertsUpdated = (updated) => setAlerts(updated);
             socket.on('new_alert', handleNewAlert);
             socket.on('alerts_updated', handleAlertsUpdated);
@@ -250,7 +331,7 @@ const CorporateDashboard = () => {
                 socket.off('alerts_updated', handleAlertsUpdated);
             };
         }
-    }, [socket, fetchConfig, viewedSellerId]);
+    }, [socket, fetchConfig, viewedSellerId, notifyBrowser]);
 
     // Reload status when admin switches seller
     useEffect(() => {
@@ -260,6 +341,8 @@ const CorporateDashboard = () => {
                     api.get('/api/alerts'),
                     api.get('/api/status')
                 ]);
+                // Las que ya estaban al cargar no disparan aviso del navegador.
+                markAlertsSeen(alertRes.data);
                 setAlerts(alertRes.data);
                 setStatus(statusRes.data.status || 'initializing');
                 setQrData(statusRes.data.qr || null);
@@ -273,7 +356,7 @@ const CorporateDashboard = () => {
         const handleConfigUpdate = () => fetchConfig();
         window.addEventListener('config-updated', handleConfigUpdate);
         return () => window.removeEventListener('config-updated', handleConfigUpdate);
-    }, [fetchConfig, viewedSellerId]);
+    }, [fetchConfig, viewedSellerId, markAlertsSeen]);
 
     const [processingAction, setProcessingAction] = useState(null); // Prevent double-click
 
@@ -339,6 +422,14 @@ const CorporateDashboard = () => {
         }
     };
 
+    // Abrir el chat de un aviso: lo usan las filas del desplegable de la campana
+    // y el clic en un aviso del navegador.
+    const openAlertChat = (alert) => {
+        setShowNotifications(false);
+        handleQuickAction(alert.userPhone, 'chat');
+    };
+    useEffect(() => { openAlertChatRef.current = openAlertChat; });
+
     const [manualEntry, setManualEntry] = useState(null);
     const [submittingManual, setSubmittingManual] = useState(false);
     // OJO: el modal manda un payload { manualAddr, shippingType, paymentMethod, ... },
@@ -362,8 +453,20 @@ const CorporateDashboard = () => {
         }
     };
 
-    const renderContent = () => {
-        switch (activeTab) {
+    // Grupo y pestaña que se están mostrando. Si `activeTab` apunta a una pestaña
+    // que este usuario no ve (solo admin), cae en la primera del grupo.
+    const activeGroup = groupOfTab(activeTab);
+    const activeGroupTabs = activeGroup ? visibleTabsOf(activeGroup) : [];
+    const currentTab = activeGroup
+        ? (activeGroupTabs.find(t => t.id === activeTab) || activeGroupTabs[0]).id
+        : activeTab;
+
+    const loadErrorFallback = (tab) => (
+        <p className="p-6 text-sm text-slate-500 dark:text-slate-400">No se pudo cargar {TAB_NAMES[tab] || 'esta sección'}. Recargá la página.</p>
+    );
+
+    const renderTab = (tab) => {
+        switch (tab) {
             case 'dashboard': return <DashboardView alerts={alerts} config={config} handleQuickAction={handleQuickAction} status={status} qrData={qrData} />;
             case 'statistics': return <AdvancedAnalyticsView />;
             case 'comms': return <CommsView initialChatId={targetChatId} onChatSelected={() => setTargetChatId(null)} onChatOpened={() => { if (!isMobile) setSidebarCollapsed(true); }} alerts={alerts} onAlertAction={handleQuickAction} />;
@@ -397,11 +500,38 @@ const CorporateDashboard = () => {
         }
     };
 
+    const renderContent = () => {
+        if (!activeGroup) return renderTab(activeTab);
+        // Cada pestaña lleva su propio LazyBoundary + Suspense: mientras baja (o si
+        // falla) la barra de pestañas sigue en su lugar.
+        return (
+            <TabbedView
+                ariaLabel={activeGroup.label}
+                activeId={currentTab}
+                onChange={goToTab}
+                fill={FIXED_HEIGHT_TABS.includes(currentTab)}
+                tabs={activeGroupTabs.map(({ id, label, icon }) => ({
+                    id,
+                    label,
+                    icon,
+                    render: () => (
+                        <LazyBoundary key={id} fallback={loadErrorFallback(id)}>
+                            <Suspense fallback={<ViewSpinner />}>
+                                {renderTab(id)}
+                            </Suspense>
+                        </LazyBoundary>
+                    ),
+                }))}
+            />
+        );
+    };
+
     // En escritorio el menú se puede contraer a solo iconos; en el teléfono es un
     // cajón que siempre muestra los nombres.
     const collapsed = sidebarCollapsed && !isMobile;
     const navProps = (tab) => ({ tab, isActive: activeTab === tab, collapsed, onSelect: handleNavSelect });
-    const isFixedHeightTab = FIXED_HEIGHT_TABS.includes(activeTab);
+    const groupNavProps = (groupId) => ({ tab: groupId, isActive: activeGroup?.id === groupId, collapsed, onSelect: openGroup });
+    const isFixedHeightTab = FIXED_HEIGHT_TABS.includes(currentTab);
 
     return (
         <div className="flex flex-col lg:flex-row h-app overflow-hidden bg-slate-50 dark:bg-slate-900 font-sans text-slate-800 dark:text-slate-100 selection:bg-accent-100 dark:selection:bg-accent-900/50 selection:text-accent-900 dark:selection:text-accent-100 relative transition-colors duration-300">
@@ -478,10 +608,10 @@ const CorporateDashboard = () => {
                     <NavItem {...navProps('dashboard')} icon={Wifi} label="Inicio" />
                     <NavItem {...navProps('comms')} icon={MessageCircle} label="Chat & Atención" />
                     <NavItem {...navProps('rescue-queue')} icon={LifeBuoy} label="Cola de rescate" />
-                    <NavItem {...navProps('logistics')} icon={ShoppingCart} label="Ventas & Logística" />
-                    <NavItem {...navProps('statistics')} icon={BarChart2} label="Estadísticas" />
-                    <NavItem {...navProps('payments')} icon={CreditCard} label="Pagos MP" />
-                    <NavItem {...navProps('web-orders')} icon={Package} label="Pedidos web" />
+                    {/* Ventas = Ventas y logística + Pagos MP + Pedidos web;
+                        Estadísticas = Estadísticas + Embudo + Horas (pestañas adentro). */}
+                    <NavItem {...groupNavProps('sales')} icon={ShoppingCart} label="Ventas" />
+                    <NavItem {...groupNavProps('stats')} icon={BarChart2} label="Estadísticas" />
                     <NavItem {...navProps('guion')} icon={MessagesSquare} label="Guiones (notas)" />
                     <NavItem {...navProps('playground')} icon={FlaskConical} label="Probar bot" />
                     <NavItem {...navProps('promos')} icon={Gift} label="Promos" />
@@ -493,8 +623,6 @@ const CorporateDashboard = () => {
                         {!collapsed && <p className="text-xs 2xl:text-sm font-semibold text-slate-500 dark:text-slate-300 uppercase tracking-wider mb-4 px-4">Administración</p>}
                         <NavItem {...navProps('settings')} icon={Settings} label="Configuración" />
                         {isAdmin && <NavItem {...navProps('accounts')} icon={Users} label="Usuarios" />}
-                        {isAdmin && <NavItem {...navProps('account-stats')} icon={BarChart2} label="Horas Vendedores" />}
-                        {isAdmin && <NavItem {...navProps('funnel-analytics')} icon={Activity} label="Analítica Embudo" />}
                     </div>
                 </nav>
 
@@ -612,14 +740,14 @@ const CorporateDashboard = () => {
 
                             {/* Dropdown */}
                             {showNotifications && (
-                                <div id="panel-notificaciones" className="absolute right-0 mt-3 w-[18rem] sm:w-96 bg-white dark:bg-slate-800 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-slate-700 z-50 overflow-hidden animate-fade-in flex flex-col">
+                                <div id="panel-notificaciones" className="fixed top-[calc(3.5rem+env(safe-area-inset-top)+0.5rem)] right-3 sm:absolute sm:top-full sm:right-0 sm:mt-3 w-[18rem] max-w-[calc(100vw-1.5rem)] sm:w-96 bg-white dark:bg-slate-800 rounded-2xl shadow-[0_10px_40px_-10px_rgba(0,0,0,0.1)] dark:shadow-[0_10px_40px_-10px_rgba(0,0,0,0.5)] border border-slate-200 dark:border-slate-700 z-50 overflow-hidden animate-fade-in motion-reduce:animate-none flex flex-col">
                                     <div className="p-4 border-b border-slate-100 dark:border-slate-700/50 flex justify-between items-center bg-slate-50/50 dark:bg-slate-800/50">
                                         <h2 className="font-extrabold text-slate-800 dark:text-slate-100 text-sm">Notificaciones</h2>
                                         {alerts.length > 0 && (
                                             <span className="text-[10px] font-bold text-accent-600 dark:text-accent-400 bg-accent-50 dark:bg-accent-900/40 px-2 py-1 rounded-lg uppercase tracking-wider">{alerts.length} {alerts.length === 1 ? 'novedad' : 'novedades'}</span>
                                         )}
                                     </div>
-                                    <div className="max-h-[60vh] overflow-y-auto custom-scrollbar">
+                                    <div className="max-h-[45vh] sm:max-h-[60vh] overflow-y-auto custom-scrollbar">
                                         {alerts.length === 0 ? (
                                             <div className="p-10 text-center text-slate-500 dark:text-slate-400">
                                                 <div className="w-16 h-16 rounded-full bg-slate-100 dark:bg-slate-700/50 flex items-center justify-center mx-auto mb-4 border border-slate-200 dark:border-slate-700/50">
@@ -635,10 +763,7 @@ const CorporateDashboard = () => {
                                                         <button
                                                             type="button"
                                                             className="w-full text-left p-4 border-b border-slate-50 dark:border-slate-700/50 hover:bg-danger-50/60 dark:hover:bg-danger-900/10 focus-visible:bg-danger-50/60 dark:focus-visible:bg-danger-900/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-accent-500 transition-colors cursor-pointer flex gap-3 group"
-                                                            onClick={() => {
-                                                                setShowNotifications(false);
-                                                                handleQuickAction(alert.userPhone, 'chat');
-                                                            }}
+                                                            onClick={() => openAlertChat(alert)}
                                                         >
                                                             <span className="w-10 h-10 rounded-full bg-danger-100 dark:bg-danger-900/30 text-danger-600 dark:text-danger-400 flex items-center justify-center flex-shrink-0 mt-0.5 shadow-sm" aria-hidden="true">
                                                                 <AlertTriangle className="w-5 h-5" />
@@ -654,6 +779,37 @@ const CorporateDashboard = () => {
                                                     </li>
                                                 ))}
                                             </ul>
+                                        )}
+                                    </div>
+                                    {/* Avisos del navegador: solo con el panel abierto en
+                                        segundo plano (ver useBrowserNotifications). */}
+                                    <div className="px-4 py-3 border-t border-slate-100 dark:border-slate-700/50 bg-slate-50/50 dark:bg-slate-800/50">
+                                        <div className="flex items-center justify-between gap-3 min-h-[44px]">
+                                            <div className="min-w-0">
+                                                <p id="avisos-dispositivo-label" className="text-sm font-semibold text-slate-800 dark:text-slate-100">Avisarme en este dispositivo</p>
+                                                <p id="avisos-dispositivo-hint" className="text-xs text-slate-500 dark:text-slate-400 leading-snug">
+                                                    {!browserNotifs.supported
+                                                        ? 'Este navegador no permite avisos.'
+                                                        : 'Cuando el panel queda abierto en segundo plano.'}
+                                                </p>
+                                            </div>
+                                            <button
+                                                type="button"
+                                                role="switch"
+                                                aria-checked={browserNotifs.enabled}
+                                                aria-labelledby="avisos-dispositivo-label"
+                                                aria-describedby="avisos-dispositivo-hint"
+                                                disabled={!browserNotifs.supported}
+                                                onClick={() => browserNotifs.setEnabled(!browserNotifs.enabled)}
+                                                className={`relative inline-flex h-6 w-11 flex-shrink-0 rounded-full transition-colors motion-reduce:transition-none before:absolute before:-inset-y-2.5 before:inset-x-0 before:content-[''] focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-800 disabled:opacity-50 disabled:cursor-not-allowed ${browserNotifs.enabled ? 'bg-accent-500' : 'bg-slate-300 dark:bg-slate-600'}`}
+                                            >
+                                                <span aria-hidden="true" className={`inline-block h-5 w-5 rounded-full bg-white shadow transition-transform motion-reduce:transition-none mt-0.5 ${browserNotifs.enabled ? 'translate-x-[22px]' : 'translate-x-0.5'}`} />
+                                            </button>
+                                        </div>
+                                        {browserNotifs.supported && browserNotifs.blocked && (
+                                            <p role="status" className="mt-1.5 text-xs text-warning-700 dark:text-warning-400 leading-snug">
+                                                El navegador tiene bloqueados los avisos de este sitio. Se habilitan desde los ajustes del sitio (el candado junto a la dirección).
+                                            </p>
                                         )}
                                     </div>
                                 </div>
@@ -689,8 +845,8 @@ const CorporateDashboard = () => {
                         <div className={`flex-1 flex flex-col w-full ${isFixedHeightTab ? 'min-h-0' : ''} ${activeTab === 'comms' ? '' : 'max-w-[1600px] mx-auto'}`}>
                             {/* key: un fallo al bajar una vista no deja el aviso pegado en las demás. */}
                             <LazyBoundary
-                                key={activeTab}
-                                fallback={<p className="p-6 text-sm text-slate-500 dark:text-slate-400">No se pudo cargar {TAB_NAMES[activeTab] || 'esta sección'}. Recargá la página.</p>}
+                                key={activeGroup ? activeGroup.id : activeTab}
+                                fallback={loadErrorFallback(currentTab)}
                             >
                                 <Suspense fallback={<ViewSpinner />}>
                                     {renderContent()}
@@ -707,11 +863,13 @@ const CorporateDashboard = () => {
                     {[
                         { tab: 'dashboard',  icon: Wifi,           label: 'Inicio'  },
                         { tab: 'comms',      icon: MessageCircle,  label: 'Chat'    },
-                        { tab: 'logistics',  icon: ShoppingCart,   label: 'Ventas'  },
-                        { tab: 'statistics', icon: BarChart2,      label: 'Stats'   },
+                        { tab: 'logistics',  icon: ShoppingCart,   label: 'Ventas',  group: 'sales' },
+                        { tab: 'statistics', icon: BarChart2,      label: 'Stats',   group: 'stats' },
                         { tab: '__more__',   icon: MoreHorizontal, label: 'Más'     },
-                    ].map(({ tab, icon: Icon, label }) => {
-                        const isActive = tab === '__more__' ? mobileMenuOpen : activeTab === tab;
+                    ].map(({ tab, icon: Icon, label, group }) => {
+                        const isActive = tab === '__more__'
+                            ? mobileMenuOpen
+                            : (group ? activeGroup?.id === group : activeTab === tab);
                         return (
                             <button
                                 key={tab}
@@ -722,9 +880,10 @@ const CorporateDashboard = () => {
                                 onClick={() => {
                                     if (tab === '__more__') {
                                         setMobileMenuOpen(prev => !prev);
+                                    } else if (group) {
+                                        openGroup(group);
                                     } else {
-                                        setActiveTab(tab);
-                                        setMobileMenuOpen(false);
+                                        handleNavSelect(tab);
                                     }
                                 }}
                                 className={`relative flex-1 flex flex-col items-center justify-center gap-0.5 py-2 transition-colors duration-200 ${isActive ? 'text-accent-600 dark:text-accent-400' : 'text-slate-500 dark:text-slate-400'}`}

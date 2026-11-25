@@ -91,6 +91,16 @@ Entraron el 2026-11-12, tras revisar a mano las charlas del guion por zona:
   último en hablar fue el cliente, con el mismo criterio de "sin responder" que `/resume-chat`
   (`pickWaitingChats` en `waitingChats.js`, función pura). Solo lee; ventana de 7 días, la de las
   pausas. Tests: `tests/waiting_chats.test.js`.
+- Panel, 25-nov: el menú agrupa Ventas (Ventas / Pagos MP / Pedidos web) y Estadísticas
+  (Estadísticas / Embudo / Horas) como pestañas (`shell/TabbedView.jsx`, `TAB_GROUPS` en
+  `CorporateDashboard.jsx`); los ids de tab viejos siguen valiendo. `lastMessage.fromMe` en
+  `GET /chats` alimenta el filtro "Sin responder" de la lista de chats (`comms/chatFilters.js`).
+  Con un solo vendedor se ocultan el selector y la columna Vendedor y "Pausar TODOS". Pagos MP
+  filtra por período en el cliente (7 días por defecto). `useBrowserNotifications` avisa con el
+  panel abierto en segundo plano: NO es push (eso pide service worker + VAPID + una tabla).
+- Barra del agente (`agent/sidebar.js`), 25-nov: diálogos propios en vez de `prompt/confirm`,
+  guion por etapas con buscador, y un solo botón Pausar/Activar que lee `paused` de
+  `GET /chat-state/:id`. Todo vive dentro de `bootstrap()` porque se serializa a la página.
 - `flushPendingToQueue` (`clientPool.ts`) — al apagar, los mensajes en la espera de agrupado
   pasan a BullMQ. Hasta entonces cada deploy perdía lo que estuviera en esos segundos.
 - El cache semántico quedó **apagado por defecto** (`SEMANTIC_CACHE=1` lo prende): reutilizaba

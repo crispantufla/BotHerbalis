@@ -171,7 +171,7 @@ const PriceEditor = () => {
                 <button
                     type="button"
                     onClick={savePrices}
-                    className="flex-shrink-0 bg-success-600 hover:bg-success-700 text-white px-6 py-2 rounded-md font-medium transition-colors shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-success-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
+                    className="flex-shrink-0 bg-success-700 hover:bg-success-800 text-white px-6 py-2 rounded-md font-medium transition-colors shadow-sm focus:outline-none focus-visible:ring-2 focus-visible:ring-success-500 focus-visible:ring-offset-2 dark:focus-visible:ring-offset-slate-900"
                 >
                     Guardar Cambios
                 </button>

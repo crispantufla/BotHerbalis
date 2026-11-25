@@ -380,21 +380,24 @@ const PromoView = ({ onGoToChat }) => {
                                 key={c.id}
                                 padding="md"
                                 interactive
-                                // No puede ser un <button>: adentro lleva los botones de acción.
-                                role="button"
-                                tabIndex={0}
-                                aria-pressed={selectedId === c.id}
-                                aria-label={`Ver la campaña ${c.name}`}
-                                className={cn('cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-accent-500', selectedId === c.id && 'ring-2 ring-accent-500')}
-                                onClick={() => setSelectedId(c.id)}
-                                onKeyDown={(e) => {
-                                    if (e.target !== e.currentTarget) return;
-                                    if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); setSelectedId(c.id); }
-                                }}
+                                // Tarjeta con enlace estirado: el título es el botón y su
+                                // ::after cubre la tarjeta; los botones de acción van encima
+                                // (relative z-10). Sin interactivos anidados.
+                                className={cn('relative', selectedId === c.id && 'ring-2 ring-accent-500')}
                             >
                                 <div className="flex items-start justify-between gap-2">
                                     <div className="min-w-0">
-                                        <h2 className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">{c.name}</h2>
+                                        <h2 className="font-semibold text-sm text-slate-900 dark:text-slate-100 truncate">
+                                            <button
+                                                type="button"
+                                                aria-pressed={selectedId === c.id}
+                                                aria-label={`Ver la campaña ${c.name}`}
+                                                onClick={() => setSelectedId(c.id)}
+                                                className="max-w-full truncate text-left align-top font-semibold focus:outline-none after:absolute after:inset-0 after:rounded-card after:content-[''] focus-visible:after:ring-2 focus-visible:after:ring-accent-500 focus-visible:after:ring-offset-2 dark:focus-visible:after:ring-offset-slate-900"
+                                            >
+                                                {c.name}
+                                            </button>
+                                        </h2>
                                         <p className="text-xs text-slate-500 dark:text-slate-400">
                                             {c.stats.sent}/{c.stats.total} enviados · {c.stats.replied} respondieron · {c.stats.converted} compraron
                                         </p>
@@ -402,7 +405,7 @@ const PromoView = ({ onGoToChat }) => {
                                     </div>
                                     <Badge tone={STATUS[c.status]?.tone || 'neutral'} size="sm">{STATUS[c.status]?.label || c.status}</Badge>
                                 </div>
-                                <div className="flex flex-wrap gap-1.5 mt-3" onClick={(e) => e.stopPropagation()}>
+                                <div className="relative z-10 flex flex-wrap gap-1.5 mt-3 pointer-events-none [&>*]:pointer-events-auto">
                                     {(c.status === 'draft' || c.status === 'paused') && <Button size="sm" leftIcon={Play} onClick={() => act(c.id, c.status === 'draft' ? 'start' : 'resume')} loading={busy}>{c.status === 'draft' ? 'Iniciar' : 'Reanudar'}</Button>}
                                     {c.status === 'running' && <Button size="sm" variant="secondary" leftIcon={Pause} onClick={() => act(c.id, 'pause')} loading={busy}>Pausar</Button>}
                                     {!['finished', 'cancelled'].includes(c.status) && <Button size="sm" variant="ghost" leftIcon={Pencil} onClick={() => openEdit(c)} disabled={busy}>Editar</Button>}

@@ -406,6 +406,11 @@ CP: ${order.cp || '—'}`;
         ]))
         : Array.from(new Set(orders.map(o => o.seller).filter(Boolean)));
     const labelForSeller = (sid) => sellerIdToName[sid] || capitalize(sid || '');
+    // Con un solo vendedor, el selector y la columna "Vendedor" repiten lo mismo
+    // en cada fila: se muestran solo con 2 o más vendedores (admin) o, para un
+    // vendedor, cuando sus pedidos salieron de más de un número.
+    const showSeller = isAdmin ? (sellers || []).length > 1 : uniqueFilterOptions.length > 1;
+    const columnCount = showSeller ? 7 : 6;
 
     const filteredOrders = isAdmin
         ? orders
@@ -464,7 +469,7 @@ CP: ${order.cp || '—'}`;
                             {['Todos', ...STATUS_OPTIONS].map(s => <option key={s} value={s}>{s}</option>)}
                         </Select>
                     </div>
-                    {(isAdmin || uniqueFilterOptions.length > 1) && (
+                    {showSeller && (
                         <div className="sm:w-56 flex-shrink-0">
                             <Select
                                 value={sellerFilter}
@@ -501,7 +506,7 @@ CP: ${order.cp || '—'}`;
                                 <th className="px-4 py-3.5 hidden md:table-cell">Fecha</th>
                                 <th className="px-4 py-3.5 w-full">Cliente</th>
                                 <th className="px-4 py-3.5">Teléfono</th>
-                                <th className="px-4 py-3.5 text-center">Vendedor</th>
+                                {showSeller && <th className="px-4 py-3.5 text-center">Vendedor</th>}
                                 <th className="px-4 py-3.5 text-center">Envío</th>
                                 <th className="px-4 py-3.5 text-center">Estado</th>
                                 <th className="px-4 py-3.5 text-right">Acciones</th>
@@ -514,14 +519,14 @@ CP: ${order.cp || '—'}`;
                                         <td className="px-4 py-3 hidden md:table-cell"><div className="h-3 bg-slate-200 dark:bg-slate-700/50 rounded w-20" /></td>
                                         <td className="px-4 py-3"><div className="h-3 bg-slate-200 dark:bg-slate-700/50 rounded w-32" /></td>
                                         <td className="px-4 py-3"><div className="h-3 bg-slate-200 dark:bg-slate-700/50 rounded w-24" /></td>
-                                        <td className="px-4 py-3 text-center"><div className="h-3 bg-slate-200 dark:bg-slate-700/50 rounded w-16 mx-auto" /></td>
+                                        {showSeller && <td className="px-4 py-3 text-center"><div className="h-3 bg-slate-200 dark:bg-slate-700/50 rounded w-16 mx-auto" /></td>}
                                         <td className="px-4 py-3 text-center"><div className="h-5 bg-slate-200 dark:bg-slate-700/50 rounded-full w-20 mx-auto" /></td>
                                         <td className="px-4 py-3 text-center"><div className="h-5 bg-slate-200 dark:bg-slate-700/50 rounded-full w-20 mx-auto" /></td>
                                         <td className="px-4 py-3"><div className="flex gap-2 justify-end"><div className="w-8 h-8 rounded bg-slate-200 dark:bg-slate-700/50" /><div className="w-8 h-8 rounded bg-slate-200 dark:bg-slate-700/50" /></div></td>
                                     </tr>
                                 ))
                             ) : filteredOrders.length === 0 ? (
-                                <tr><td colSpan="7">
+                                <tr><td colSpan={columnCount}>
                                     <EmptyState
                                         icon={Inbox}
                                         title="No se encontraron pedidos"
@@ -565,6 +570,7 @@ CP: ${order.cp || '—'}`;
                                                     {order.cliente ? '+' + order.cliente.split('@')[0].replace(/\D/g, '') : '—'}
                                                 </span>
                                             </td>
+                                            {showSeller && (
                                             <td className="px-4 py-3.5 text-center">
                                                 {order.instanceId || order.seller || (sharedSales && order.bot) ? (
                                                     <div className="flex flex-col items-center gap-0.5">
@@ -586,6 +592,7 @@ CP: ${order.cp || '—'}`;
                                                     </div>
                                                 ) : <span className="text-sm text-slate-500 dark:text-slate-400">—</span>}
                                             </td>
+                                            )}
                                             <td className="px-4 py-3.5 text-center">
                                                 <div className="flex flex-col items-center gap-1">
                                                     <Badge tone={shipMeta.tone} size="md">
@@ -700,7 +707,7 @@ CP: ${order.cp || '—'}`;
                                                 </span>
                                             </div>
                                         </div>
-                                        {(order.instanceId || order.seller || (sharedSales && order.bot)) && (
+                                        {showSeller && (order.instanceId || order.seller || (sharedSales && order.bot)) && (
                                             <p className="text-xs text-slate-500 dark:text-slate-400 flex flex-wrap items-center gap-x-1.5 gap-y-1">
                                                 {sharedSales && order.bot && (
                                                     <Badge tone={order.peer ? 'accent' : 'neutral'} size="md">{order.bot}</Badge>

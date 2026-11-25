@@ -91,6 +91,32 @@ function bootstrap(initW) {
         promo_opted_out: 'Promo — no quiere más mensajes', promo_other_product: 'Promo — pide otro producto',
         promo_product_confirm_list: 'Promo — otro producto a precio de lista',
     };
+    // Etapas del guion: 38 pasos en una lista plana no se podían recorrer.
+    const HB_STAGES = [['saludo', 'Saludo'], ['precios', 'Precios'], ['producto', 'Producto'], ['zona', 'Zona y envío'], ['pago', 'Pago'], ['cierre', 'Cierre y confirmación'], ['promo', 'Promo'], ['otros', 'Otros']];
+    function stageOfKey(k) {
+        if (/^(greeting|recommendation)/.test(k)) return 'saludo';
+        if (/^prices/.test(k)) return 'precios';
+        if (/^preference/.test(k)) return 'producto';
+        if (/^zone/.test(k)) return 'zona';
+        if (/^(payment|prepay|transfer)/.test(k)) return 'pago';
+        if (/^(closing|order_confirmation)/.test(k)) return 'cierre';
+        if (/^promo/.test(k)) return 'promo';
+        return 'otros';
+    }
+    // En qué etapa está el chat abierto, según el paso del flujo (state.step).
+    function stageOfStep(step) {
+        const st = String(step || '');
+        if (!st) return null;
+        if (/promo/.test(st)) return 'promo';
+        if (/greeting|weight|^new$/.test(st)) return 'saludo';
+        if (/preference|plan/.test(st)) return 'producto';
+        if (/zone/.test(st)) return 'zona';
+        if (/payment|transfer/.test(st)) return 'pago';
+        if (/data|maps|confirmation|validation|waiting_ok|completed/.test(st)) return 'cierre';
+        return null;
+    }
+    const norm = (t) => String(t || '').toLowerCase().normalize('NFD').replace(/[\u0300-\u036f]/g, '');
+
     function stepLabel(k) {
         return HB_STEP_LABELS[k] || k.replace(/_/g, ' ').replace(/^./, (c) => c.toUpperCase());
     }
@@ -402,6 +428,22 @@ function bootstrap(initW) {
       .hb-sec small{display:block;font-size:calc(11px * var(--hb-fs));font-weight:400;color:#8696a0;margin-top:2px}
       #hb-steps{display:flex;flex-direction:column;gap:6px;flex:1 1 auto;min-height:min(220px,45vh);overflow-y:auto}
       #hb-steps>*{flex-shrink:0}
+      #hb-botstate{display:flex;align-items:center;gap:6px;margin-top:5px;font-size:calc(12px * var(--hb-fs));color:#00d26a}
+      #hb-botstate:empty{display:none}
+      #hb-botstate i{width:8px;height:8px;border-radius:50%;background:currentColor;flex-shrink:0}
+      #hb-botstate.off{color:#f1b44c}
+      #hb-q{background:#202c33;border:1px solid #3b4a54;border-radius:8px;color:#e9edef;padding:8px 10px;font-size:calc(13px * var(--hb-fs));font-family:inherit;width:100%}
+      #hb-q::placeholder{color:#8696a0}
+      .hb-step[hidden],.hb-grp[hidden],#hb-q-none[hidden]{display:none}
+      .hb-grp{border:1px solid #222d34;border-radius:8px;background:#0f1a20}
+      .hb-grp>summary{display:flex;align-items:center;flex-wrap:wrap;gap:6px 8px;cursor:pointer;padding:9px 10px;font-size:calc(12px * var(--hb-fs));font-weight:600;color:#d1d7db;list-style:none;border-radius:8px}
+      .hb-grp>summary::-webkit-details-marker{display:none}
+      .hb-grp>summary::before{content:'';width:6px;height:6px;border-right:2px solid #8696a0;border-bottom:2px solid #8696a0;transform:rotate(-45deg);transition:transform .15s;flex-shrink:0;margin:0 2px}
+      .hb-grp[open]>summary::before{transform:rotate(45deg)}
+      .hb-grp .n{color:#8696a0;font-weight:400}
+      .hb-grp .now{margin-left:auto;font-size:calc(11px * var(--hb-fs));font-weight:600;color:#06120e;background:#00d26a;border-radius:999px;padding:1px 8px;display:none}
+      .hb-grp.cur{border-color:#00a884}.hb-grp.cur .now{display:inline}
+      .hb-grp .hb-gl{display:flex;flex-direction:column;gap:6px;padding:0 8px 8px}
       .hb-msg{color:#8696a0;font-size:calc(12px * var(--hb-fs))}.hb-msg.err{color:#ff8a98}
       .hb-step{display:block;width:100%;text-align:left;color:inherit;background:#111b21;border:1px solid #222d34;border-radius:8px;padding:8px 10px;cursor:pointer}
       .hb-step:hover{border-color:#00a884;background:#16232b}
@@ -433,7 +475,7 @@ function bootstrap(initW) {
       #hb-tog{position:fixed;top:76px;right:0;z-index:100000;display:flex;align-items:center;justify-content:center;width:40px;height:40px;background:#00a884;color:#06120e;border:0;border-radius:8px 0 0 8px;cursor:pointer;transition:right .22s cubic-bezier(.16,1,.3,1)}
       #hb-tog .hb-ic{width:20px;height:20px}
       #hb-credit{flex-shrink:0;text-align:center;padding:6px 10px;border-top:1px solid #222d34;background:#111b21;color:#8696a0;font-size:11px}
-      @media (prefers-reduced-motion: reduce){#hb-panel,#hb-tog{transition:none}}
+      @media (prefers-reduced-motion: reduce){#hb-panel,#hb-tog,.hb-grp>summary::before{transition:none}}
     `;
         document.head.appendChild(style);
 
@@ -453,16 +495,16 @@ function bootstrap(initW) {
         <button type="button" id="hb-close" aria-label="Cerrar panel" title="Cerrar panel">${icon('x')}</button>
       </div>
       <div id="hb-body">
-        <div id="hb-open">Chat abierto: <b id="hb-openname">—</b></div>
+        <div id="hb-open">Chat abierto: <b id="hb-openname">—</b><div id="hb-botstate" role="status"></div></div>
         <div class="hb-acts">
-          <button type="button" class="hb-act warn" data-act="pause">${icon('pause')}Pausar</button>
-          <button type="button" class="hb-act" data-act="resume">${icon('play')}Activar</button>
+          <button type="button" class="hb-act warn" id="hb-botsw">${icon('pause')}Pausar bot</button>
           <button type="button" class="hb-act" data-act="summarize">${icon('note')}Resumen</button>
           <button type="button" class="hb-act" data-act="reset">${icon('reset')}Reiniciar</button>
           <button type="button" class="hb-act mp" id="hb-mp">${icon('card')}Cobro MP</button>
         </div>
         <div id="hb-feed" role="status" aria-live="polite"></div>
         <div class="hb-sec">Guion<small>Tocá un paso para ponerlo en el chat.</small></div>
+        <input id="hb-q" type="search" autocomplete="off" placeholder="Buscar en el guion…" aria-label="Buscar en el guion" />
         <div id="hb-steps"><span class="hb-msg">Cargando guion…</span></div>
         <div class="hb-sec">Confirmar pedido</div>
         <button type="button" id="hb-ord-msg" class="hb-ord g">${icon('send')}<span>Pedido ingresado<small>Envía la confirmación al cliente.</small></span></button>
@@ -623,13 +665,55 @@ function bootstrap(initW) {
             return false;
         };
 
-        // ── Acciones (pausar/activar/resumen/reiniciar — el MP se maneja aparte) ─
+        // ── Estado del chat abierto ───────────────────────────────────────────
+        // Un solo botón para pausar/activar, que dice lo que va a hacer, y una
+        // línea con el estado real (antes había dos botones y ninguna pista de
+        // si el bot estaba pausado en ese chat). También marca en el guion la
+        // etapa en la que está la charla.
+        const botSw = document.getElementById('hb-botsw');
+        let chatState = null;
+        function paintChatState(openStage) {
+            const st = document.getElementById('hb-botstate');
+            const known = chatState && typeof chatState.paused === 'boolean';
+            const paused = !!(chatState && chatState.paused);
+            st.className = known && paused ? 'off' : '';
+            st.innerHTML = known ? '<i></i>' : '';
+            if (known) st.appendChild(document.createTextNode(paused ? 'Bot pausado en este chat' : 'Bot activo en este chat'));
+            botSw.className = 'hb-act' + (paused ? '' : ' warn');
+            botSw.innerHTML = paused ? icon('play') + 'Activar bot' : icon('pause') + 'Pausar bot';
+            const cur = chatState ? stageOfStep(chatState.step) : null;
+            document.querySelectorAll('.hb-grp').forEach((g) => {
+                const is = g.getAttribute('data-stage') === cur;
+                g.classList.toggle('cur', is);
+                if (openStage && is && !document.getElementById('hb-q').value) g.open = true;
+            });
+        }
+        async function refreshChatState(openStage) {
+            let next = null;
+            if (openChatName() && typeof window.hbGetChatState === 'function') {
+                try { const r = await window.hbGetChatState(); if (r && r.ok) next = r.state || null; } catch (e) { /* sin estado: el botón queda en "Pausar bot" */ }
+            }
+            chatState = next;
+            paintChatState(openStage);
+        }
+        botSw.onclick = async () => {
+            if (!connected('hbAction')) return;
+            const act = chatState && chatState.paused ? 'resume' : 'pause';
+            await run(botSw, () => window.hbAction(act));
+            // Refleja el cambio ya, y después lo confirma con el servidor.
+            chatState = Object.assign({}, chatState, { paused: act === 'pause' });
+            paintChatState(false);
+            refreshChatState(false);
+        };
+
+        // ── Acciones (resumen/reiniciar — el MP se maneja aparte) ─────────────
         panel.querySelectorAll('.hb-act[data-act]').forEach((b) => {
             b.onclick = async () => {
                 const act = b.getAttribute('data-act');
                 if (!connected('hbAction')) return;
                 if (act === 'reset' && !(await askConfirm('¿Reiniciar este chat?', 'El bot olvida lo conversado con este cliente y empieza de cero. No se puede deshacer.', 'Reiniciar chat', true))) return;
-                run(b, () => window.hbAction(act));
+                await run(b, () => window.hbAction(act));
+                if (act === 'reset') refreshChatState(true);
             };
         });
         const ordMsg = document.getElementById('hb-ord-msg');
@@ -673,21 +757,65 @@ function bootstrap(initW) {
                 const keys = Object.keys(flow).filter((k) => flow[k] && flow[k].response);
                 if (!keys.length) { say('El guion no tiene pasos cargados.', false); return; }
                 cont.innerHTML = '';
-                keys.forEach((k) => {
-                    const btn = document.createElement('button');
-                    btn.type = 'button';
-                    btn.className = 'hb-step';
-                    const resp = resolvePrices(flow[k].response, priceMap);
-                    const kEl = document.createElement('span'); kEl.className = 'k'; kEl.textContent = stepLabel(k);
-                    const pEl = document.createElement('span'); pEl.className = 'p'; pEl.textContent = previewText(resp);
-                    btn.appendChild(kEl); btn.appendChild(pEl);
-                    btn.onclick = () => handleStepClick(resp);
-                    cont.appendChild(btn);
+                HB_STAGES.forEach(([id, title]) => {
+                    const mine = keys.filter((k) => stageOfKey(k) === id);
+                    if (!mine.length) return;
+                    const grp = document.createElement('details');
+                    grp.className = 'hb-grp';
+                    grp.setAttribute('data-stage', id);
+                    const sum = document.createElement('summary');
+                    sum.appendChild(document.createTextNode(title));
+                    const n = document.createElement('span'); n.className = 'n'; n.textContent = String(mine.length);
+                    const cur = document.createElement('span'); cur.className = 'now'; cur.textContent = 'Etapa de este chat';
+                    sum.appendChild(n); sum.appendChild(cur);
+                    const list = document.createElement('div'); list.className = 'hb-gl';
+                    mine.forEach((k) => {
+                        const btn = document.createElement('button');
+                        btn.type = 'button';
+                        btn.className = 'hb-step';
+                        const resp = resolvePrices(flow[k].response, priceMap);
+                        const kEl = document.createElement('span'); kEl.className = 'k'; kEl.textContent = stepLabel(k);
+                        const pEl = document.createElement('span'); pEl.className = 'p'; pEl.textContent = previewText(resp);
+                        btn.appendChild(kEl); btn.appendChild(pEl);
+                        btn.setAttribute('data-q', norm(stepLabel(k) + ' ' + pEl.textContent));
+                        btn.onclick = () => handleStepClick(resp);
+                        list.appendChild(btn);
+                    });
+                    grp.appendChild(sum); grp.appendChild(list);
+                    cont.appendChild(grp);
                 });
+                const none = document.createElement('span'); none.className = 'hb-msg'; none.id = 'hb-q-none'; none.hidden = true;
+                cont.appendChild(none);
+                // Buscador: filtra los pasos y abre las etapas donde hay coincidencias.
+                const q = document.getElementById('hb-q');
+                const applySearch = () => {
+                    const term = norm(q.value).trim();
+                    let total = 0;
+                    cont.querySelectorAll('.hb-grp').forEach((g) => {
+                        let hits = 0;
+                        g.querySelectorAll('.hb-step').forEach((b) => {
+                            const ok = !term || b.getAttribute('data-q').indexOf(term) !== -1;
+                            b.hidden = !ok; if (ok) hits++;
+                        });
+                        g.hidden = hits === 0;
+                        g.open = term ? hits > 0 : g.classList.contains('cur');
+                        total += hits;
+                    });
+                    none.hidden = total > 0;
+                    none.textContent = total > 0 ? '' : 'Ningún paso dice "' + q.value.trim() + '". Probá con otra palabra.';
+                };
+                q.addEventListener('input', applySearch);
+                refreshChatState(true);
             } catch (e) { say('No pude cargar el guion: ' + (e.message || e), true); }
         })();
 
-        setInterval(() => { const el = document.getElementById('hb-openname'); if (el) el.textContent = openChatName() || '— (ninguno abierto)'; }, 1000);
+        let lastChat = null;
+        setInterval(() => {
+            const el = document.getElementById('hb-openname');
+            const name = openChatName();
+            if (el) el.textContent = name || '— (ninguno abierto)';
+            if (name !== lastChat) { lastChat = name; refreshChatState(true); }
+        }, 1000);
     }
 
     build();

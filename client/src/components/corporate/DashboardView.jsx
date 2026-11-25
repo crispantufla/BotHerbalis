@@ -4,6 +4,7 @@ import { Pause, Play, CreditCard, Copy, Check, Smartphone, Clock } from 'lucide-
 import api from '../../config/axios';
 import { useToast } from '../ui/Toast';
 import { useAuth } from '../../context/AuthContext';
+import { useSeller } from '../../context/SellerContext';
 import { Button, Card, Input, IconButton } from '../ui';
 
 import StatsPanel from './dashboard/StatsPanel';
@@ -21,7 +22,11 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
     // sobre toda la flota.
     const userName = (user?.name || '').toLowerCase();
     const userSellerId = (user?.sellerId || '').toLowerCase();
-    const canPauseAll = isAdmin && (!user?.sellerId || userName === 'horacio' || userSellerId === 'horacio');
+    // Con un solo vendedor "Pausar TODOS" hace lo mismo que "Pausar este bot":
+    // solo se muestra cuando hay 2 o más.
+    const { sellers } = useSeller();
+    const multiSeller = (sellers || []).length > 1;
+    const canPauseAll = multiSeller && isAdmin && (!user?.sellerId || userName === 'horacio' || userSellerId === 'horacio');
     const [stats, setStats] = useState(null);
     const [loadingStats, setLoadingStats] = useState(true);
     const [pausingAll, setPausingAll] = useState(false);

@@ -226,11 +226,19 @@ export const useChat = (selectedChatId) => {
                     // contarlos inflaba el badge.
                     const isClientMsg = data.sender === 'user';
 
+                    // Quién habló último (filtro "Sin responder" de la lista), con
+                    // el mismo criterio que GET /chats: 'user' → false, 'bot' /
+                    // 'admin' → true. Un aviso 'system' no es mensaje de nadie:
+                    // actualiza el preview pero conserva el fromMe que había.
+                    const fromMeFor = (prevLast) => data.sender === 'system'
+                        ? (prevLast?.fromMe ?? null)
+                        : !isClientMsg;
+
                     let updated;
                     if (existingChat) {
                         updated = prev.map((c) => c.id === existingChat.id ? {
                             ...c,
-                            lastMessage: { body: data.text || '', timestamp },
+                            lastMessage: { body: data.text || '', timestamp, fromMe: fromMeFor(c.lastMessage) },
                             unreadCount: currentSelectedId === existingChat.id
                                 ? 0
                                 : (c.unreadCount || 0) + (isClientMsg ? 1 : 0),
@@ -242,7 +250,7 @@ export const useChat = (selectedChatId) => {
                             id: data.chatId,
                             name: data.chatId,
                             unreadCount: currentSelectedId === data.chatId || !isClientMsg ? 0 : 1,
-                            lastMessage: { body: data.text || '', timestamp },
+                            lastMessage: { body: data.text || '', timestamp, fromMe: fromMeFor(null) },
                             time: new Date(timestamp).toLocaleTimeString('es-AR', { hour: '2-digit', minute: '2-digit', timeZone: 'America/Argentina/Buenos_Aires' }),
                             assignedScript: data.assignedScript
                         }, ...prev];

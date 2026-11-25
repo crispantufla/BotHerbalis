@@ -1,6 +1,7 @@
 import React from 'react';
 import { ShoppingCart, Zap } from 'lucide-react';
 import { Badge, cn } from '../../ui';
+import { isUnanswered } from './chatFilters';
 
 // Display helpers — antes vivían inline en el .map(), los extraigo para que se
 // lean linealmente.
@@ -16,15 +17,39 @@ function displayPhone(chat) {
     return rawId;
 }
 
-function displayName(chat) {
-    const rawId = chat.id?.split('@')[0] || '';
-    const rawName = chat.name || '';
-    const cleanName = rawName.replace(/\D/g, '');
-    if (rawName.includes('+47') || cleanName.length > 13) return 'Contacto de Anuncio';
-    if (rawId.length > 13 && cleanName.length >= 10 && cleanName.length <= 13 && rawName.includes('+')) {
-        return 'Contacto de Anuncio';
+// Nombre real del contacto, o null. El backend manda `+<teléfono>` cuando no hay
+// nombre, un chat creado por socket trae el id (`549…@c.us`) y la búsqueda manda
+// null: nada de eso es un nombre. Lo es solo si, sacado lo que parece un id,
+// queda alguna letra.
+function realName(chat) {
+    const rawName = (chat.name || '').trim();
+    if (!rawName || rawName.includes('@')) return null;
+    if (!/\p{L}/u.test(rawName)) return null;
+    return rawName;
+}
+
+// Teléfono legible. Los dígitos nunca se cambian, solo se agrupan: código de país
+// y, para los móviles argentinos (549 + 10 dígitos), el número en bloques.
+function formatPhone(digits) {
+    if (!/^\d+$/.test(digits)) return digits;
+    if (digits.length === 13 && digits.startsWith('549')) {
+        const n = digits.slice(3);
+        // AMBA (11) usa 2 dígitos de característica; el resto se agrupa 3-3-4.
+        return n.startsWith('11')
+            ? `+54 9 11 ${n.slice(2, 6)}-${n.slice(6)}`
+            : `+54 9 ${n.slice(0, 3)} ${n.slice(3, 6)}-${n.slice(6)}`;
     }
-    return rawName || 'Desconocido';
+    return `+${digits}`;
+}
+
+// Título y segunda línea de la fila: con nombre real, el nombre arriba y el
+// número en chico; sin nombre, el número arriba y nada debajo (antes se repetía).
+function rowLabels(chat) {
+    const phone = displayPhone(chat);
+    const phoneLabel = /^\d+$/.test(phone) ? formatPhone(phone) : null; // null: id de anuncio sin teléfono
+    const name = realName(chat);
+    if (name) return { title: name, subtitle: phoneLabel || 'Contacto de anuncio' };
+    return { title: phoneLabel || 'Contacto de anuncio', subtitle: null };
 }
 
 // Highlight de match en snippet de búsqueda. Mantenemos un margen pequeño
@@ -45,6 +70,8 @@ function highlightSnippet(text, term) {
 // cuando cambia otra cosa de CommsView (cada tecla en la caja de mensaje).
 function ChatSidebarItem({ chat, isSelected, hasAlert, searchTerm, onSelect }) {
     const handleClick = () => onSelect(chat);
+    const { title, subtitle } = rowLabels(chat);
+    const unanswered = isUnanswered(chat);
 
     return (
         <button
@@ -61,12 +88,12 @@ function ChatSidebarItem({ chat, isSelected, hasAlert, searchTerm, onSelect }) {
             <div className="flex-1 min-w-0">
                 <div className="flex justify-between items-start gap-2 mb-0.5">
                     <div className="flex flex-col min-w-0">
-                        <div className="flex items-center gap-1.5">
+                        <div className="flex items-center gap-1.5 min-w-0">
                             <h3 className={cn(
-                                'font-semibold text-sm tracking-tight',
+                                'font-semibold text-sm tracking-tight truncate',
                                 isSelected ? 'text-white' : 'text-slate-900 dark:text-slate-100'
                             )}>
-                                +{displayPhone(chat)}
+                                {title}
                             </h3>
                             {hasAlert ? (
                                 <span
@@ -86,7 +113,7 @@ function ChatSidebarItem({ chat, isSelected, hasAlert, searchTerm, onSelect }) {
                             {chat.hasBought && (
                                 <span
                                     className={cn(
-                                        'inline-flex items-center text-[10px] px-1.5 py-0.5 rounded font-medium gap-1',
+                                        'inline-flex items-center flex-shrink-0 text-[10px] px-1.5 py-0.5 rounded font-medium gap-1',
                                         isSelected
                                             ? 'bg-white/20 text-white'
                                             : 'bg-success-50 dark:bg-success-900/30 text-success-700 dark:text-success-500'
@@ -98,12 +125,14 @@ function ChatSidebarItem({ chat, isSelected, hasAlert, searchTerm, onSelect }) {
                                 </span>
                             )}
                         </div>
-                        <span className={cn(
-                            'text-xs truncate',
-                            isSelected ? 'text-accent-100' : 'text-slate-500 dark:text-slate-400'
-                        )}>
-                            {displayName(chat)}
-                        </span>
+                        {subtitle && (
+                            <span className={cn(
+                                'text-xs truncate tabular-nums',
+                                isSelected ? 'text-accent-100' : 'text-slate-500 dark:text-slate-400'
+                            )}>
+                                {subtitle}
+                            </span>
+                        )}
                     </div>
                     <span className={cn(
                         'text-[11px] font-mono tabular-nums flex-shrink-0',
@@ -114,6 +143,20 @@ function ChatSidebarItem({ chat, isSelected, hasAlert, searchTerm, onSelect }) {
                 </div>
 
                 <div className="flex items-center gap-2 mt-0.5">
+                    {/* Sin responder: punto + texto para lectores de pantalla + preview en peso medio (no solo color). */}
+                    {unanswered && (
+                        <span className="flex items-center flex-shrink-0">
+                            <span
+                                aria-hidden="true"
+                                title="Sin responder"
+                                className={cn(
+                                    'w-1.5 h-1.5 rounded-full',
+                                    isSelected ? 'bg-white' : 'bg-accent-600 dark:bg-accent-400'
+                                )}
+                            />
+                            <span className="sr-only">Sin responder.</span>
+                        </span>
+                    )}
                     {chat.searchSnippet ? (
                         <p
                             className={cn(
@@ -150,7 +193,10 @@ function ChatSidebarItem({ chat, isSelected, hasAlert, searchTerm, onSelect }) {
                     ) : (
                         <p className={cn(
                             'text-xs truncate flex-1 leading-snug',
-                            isSelected ? 'text-accent-100' : 'text-slate-500 dark:text-slate-400'
+                            unanswered && 'font-medium',
+                            isSelected
+                                ? (unanswered ? 'text-white' : 'text-accent-100')
+                                : (unanswered ? 'text-slate-700 dark:text-slate-200' : 'text-slate-500 dark:text-slate-400')
                         )}>
                             {chat.lastMessage?.body || 'Sin mensajes'}
                         </p>

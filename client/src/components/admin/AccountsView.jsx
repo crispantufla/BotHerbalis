@@ -393,7 +393,7 @@ function AccountRow({ acc, rt, isAdmin, onEdit, onDelete, onResetPw, onSellerAct
             {/* Avatar */}
             <div className={cn(
                 'w-10 h-10 rounded-full flex items-center justify-center text-white font-semibold text-base flex-shrink-0',
-                isAdmin ? 'bg-warning-500' : 'bg-accent-600'
+                isAdmin ? 'bg-warning-700' : 'bg-accent-600'
             )}>
                 {acc.name.charAt(0).toUpperCase()}
             </div>
@@ -642,7 +642,7 @@ function ApiTokensSection() {
                             size="sm"
                             leftIcon={Copy}
                             onClick={() => copyToClipboard(justCreated.token)}
-                            className="!bg-success-600 hover:!bg-success-700 flex-shrink-0"
+                            className="!bg-success-700 hover:!bg-success-800 flex-shrink-0"
                         >
                             {copied ? 'Copiado' : 'Copiar'}
                         </Button>

@@ -95,11 +95,22 @@ async function _buildChatsFromDb(prisma, instanceId, ss, orders) {
         take: 600,
         select: { userPhone: true, content: true, timestamp: true, role: true }
     });
-    const latestByPhone = new Map();
+    //
+    // Una fila 'system' (avisos internos del bot) no es mensaje de nadie: para
+    // el preview y para saber quién habló último (`fromMe`) vale la fila más
+    // reciente que NO sea 'system'. Si un teléfono solo tiene filas 'system',
+    // se muestra esa y `fromMe` queda en null (no cuenta como "sin responder").
+    const latestByPhone = new Map(); // phone → fila que se muestra
+    const onlySystem = new Set();    // teléfonos que por ahora solo tienen filas 'system'
     for (const l of logs) {
+        const isSystem = l.role === 'system';
         if (!latestByPhone.has(l.userPhone)) {
+            if (latestByPhone.size >= 150) continue;
             latestByPhone.set(l.userPhone, l);
-            if (latestByPhone.size >= 150) break;
+            if (isSystem) onlySystem.add(l.userPhone);
+        } else if (!isSystem && onlySystem.has(l.userPhone)) {
+            latestByPhone.set(l.userPhone, l);
+            onlySystem.delete(l.userPhone);
         }
     }
     const phones = Array.from(latestByPhone.keys());
@@ -133,7 +144,10 @@ async function _buildChatsFromDb(prisma, instanceId, ss, orders) {
             id,
             name: nameByPhone.get(phone) || `+${phone}`,
             unreadCount: 0,
-            lastMessage: l ? { body: l.content, timestamp: tsMs } : null,
+            // fromMe: true si lo último lo dijo el bot o una persona del equipo
+            // ('bot' / 'admin'), false si fue el cliente. El panel arma con esto
+            // el filtro "Sin responder".
+            lastMessage: l ? { body: l.content, timestamp: tsMs, fromMe: l.role === 'system' ? null : l.role !== 'user' } : null,
             timestamp: Math.floor(tsMs / 1000),
             isPaused: ss?.pausedUsers?.has(id) || false,
             step: us?.step || 'new',
@@ -538,7 +552,13 @@ module.exports = (clientPool) => {
                     id: resolvedId,
                     name: resolvedName,
                     unreadCount: c.unreadCount,
-                    lastMessage: c.lastMessage ? { body: c.lastMessage.hasMedia ? 'Media' : c.lastMessage.body, timestamp: c.lastMessage.timestamp * 1000 } : null,
+                    // fromMe: quién habló último (filtro "Sin responder" del panel).
+                    // null si WhatsApp no lo informa: no cuenta como sin responder.
+                    lastMessage: c.lastMessage ? {
+                        body: c.lastMessage.hasMedia ? 'Media' : c.lastMessage.body,
+                        timestamp: c.lastMessage.timestamp * 1000,
+                        fromMe: typeof c.lastMessage.fromMe === 'boolean' ? c.lastMessage.fromMe : null
+                    } : null,
                     timestamp: c.timestamp,
                     isPaused: ss?.pausedUsers?.has(resolvedId) || ss?.pausedUsers?.has(c.id._serialized),
                     step: ss?.userState?.[resolvedId]?.step || ss?.userState?.[c.id._serialized]?.step || 'new',
@@ -577,6 +597,8 @@ module.exports = (clientPool) => {
                 mpPaymentLinkUrl: st.mpPaymentLinkUrl || null,
                 postdatado: st.postdatado || null,
                 step: st.step || null,
+                // Para el interruptor del panel del agente: ¿el bot está pausado acá?
+                paused: !!(ss?.pausedUsers && (ss.pausedUsers.has(chatId) || ss.pausedUsers.has(req.params.id))),
             });
         } catch (e) {
             res.status(500).json({ error: e.message });
@@ -1197,3 +1219,6 @@ module.exports = (clientPool) => {
 
     return router;
 };
+
+// Para tests (tests/chats_from_db.test.js): se le pasa un prisma falso.
+module.exports._buildChatsFromDb = _buildChatsFromDb;
