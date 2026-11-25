@@ -8,6 +8,7 @@ import { Button, Card, Input, IconButton } from '../ui';
 
 import StatsPanel from './dashboard/StatsPanel';
 import AlertsPanel from './dashboard/AlertsPanel';
+import WaitingPanel from './dashboard/WaitingPanel';
 import SystemStatusPanel from './dashboard/SystemStatusPanel';
 
 const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData }) => {
@@ -313,7 +314,8 @@ const DashboardView = ({ alerts = [], config, handleQuickAction, status, qrData 
 
             {/* Main grid */}
             <div className="grid grid-cols-1 lg:grid-cols-3 2xl:grid-cols-5 gap-4 sm:gap-6">
-                <div className="lg:col-span-2 2xl:col-span-3">
+                <div className="lg:col-span-2 2xl:col-span-3 space-y-4 sm:space-y-6">
+                    <WaitingPanel onOpenChat={(chatId) => handleQuickAction(chatId, 'chat')} />
                     <AlertsPanel alerts={alerts} onCommand={handleAdminCommand} onQuickAction={handleQuickAction} />
                 </div>
 

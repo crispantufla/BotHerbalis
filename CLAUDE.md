@@ -87,6 +87,10 @@ Entraron el 2026-11-12, tras revisar a mano las charlas del guion por zona:
   `[MANUAL-CHAT]`) y que WhatsApp lo muestre como nota de voz.
 - `POST /api/resume-chat` (botón "Retomar" del panel) — despausa y reencola lo que el cliente
   escribió y quedó sin respuesta. Sin `text`, lo arma de ChatLog.
+- `GET /api/waiting-chats` (bandeja "Te esperan" de Inicio, 25-nov) — chats pausados donde el
+  último en hablar fue el cliente, con el mismo criterio de "sin responder" que `/resume-chat`
+  (`pickWaitingChats` en `waitingChats.js`, función pura). Solo lee; ventana de 7 días, la de las
+  pausas. Tests: `tests/waiting_chats.test.js`.
 - `flushPendingToQueue` (`clientPool.ts`) — al apagar, los mensajes en la espera de agrupado
   pasan a BullMQ. Hasta entonces cada deploy perdía lo que estuviera en esos segundos.
 - El cache semántico quedó **apagado por defecto** (`SEMANTIC_CACHE=1` lo prende): reutilizaba

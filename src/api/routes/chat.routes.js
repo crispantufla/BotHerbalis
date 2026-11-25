@@ -1033,6 +1033,39 @@ module.exports = (clientPool) => {
         return parts.join(' ');
     }
 
+    // GET /waiting-chats — bandeja "Te esperan" de Inicio: chats pausados donde
+    // el último en hablar fue el cliente (ver waitingChats.js). Solo lee.
+    // La ventana es la misma que la de las pausas (las de más de 7 días se
+    // borran al arrancar); el tope de filas acota la consulta, no la lista.
+    const WAITING_WINDOW_DAYS = 7;
+    const WAITING_ROWS_CAP = 5000;
+    router.get('/waiting-chats', ...withSeller(clientPool), async (req, res) => {
+        try {
+            const instanceId = getInstanceId(req);
+            if (!instanceId) return res.json({ chats: [], total: 0 });
+            const { prisma } = require('../../../db');
+            const cutoff = new Date(Date.now() - WAITING_WINDOW_DAYS * 24 * 60 * 60 * 1000);
+            const paused = await prisma.user.findMany({
+                where: { instanceId, pausedAt: { not: null, gte: cutoff } },
+                select: { phone: true, name: true, pauseReason: true, pausedAt: true },
+            });
+            if (!paused.length) return res.json({ chats: [], total: 0 });
+            const rows = await prisma.chatLog.findMany({
+                where: { instanceId, userPhone: { in: paused.map((u) => u.phone) }, timestamp: { gte: cutoff } },
+                orderBy: { timestamp: 'desc' },
+                take: WAITING_ROWS_CAP,
+                select: { userPhone: true, role: true, content: true, timestamp: true },
+            });
+            const { _isBusinessAutoReply } = require('../../flows/utils/messages');
+            const { pickWaitingChats } = require('./waitingChats');
+            const chats = pickWaitingChats(paused, rows, _isBusinessAutoReply);
+            res.json({ chats: chats.slice(0, 50), total: chats.length });
+        } catch (e) {
+            logger.error('[WAITING-CHATS] error:', e);
+            res.status(500).json({ error: e.message });
+        }
+    });
+
     router.post('/resume-chat', ...withSeller(clientPool), async (req, res) => {
         try {
             const { sharedState: ss, client: cl, queue } = req.sellerInstance || {};
